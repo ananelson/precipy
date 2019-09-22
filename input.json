@@ -1,0 +1,6 @@
+{
+    "template" : "foo is {{ foo }}",
+    "analytics" : [
+        ["wavy_line_plot", {"a" : 7, "b" : 4}]
+    ]
+}

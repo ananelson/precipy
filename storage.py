@@ -16,6 +16,7 @@ def init_storage():
         storage_client = storage.Client()
 
     if storage_bucket is None:
+        storage_bucket = storage_client.create_bucket(BUCKET_NAME)
         storage_bucket = storage_client.get_bucket(BUCKET_NAME)
 
 def load_if_cached(hashed_filename):
