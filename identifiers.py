@@ -1,5 +1,6 @@
 import hashlib
 import inspect
+import batch
 
 def cache_filename_for_fn(h):
     return "%s.json" % h
@@ -17,6 +18,7 @@ def hash_for_dict(info_dict):
 def hash_for_fn(fn, kwargs):
     return hash_for_dict({
             'canonical_filename' : fn.__name__,
+            'batch' : inspect.getsource(batch),
             'source' : inspect.getsource(fn),
             'values' : kwargs
             })
