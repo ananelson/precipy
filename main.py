@@ -41,4 +41,4 @@ def render(request):
         template_text = request_json['template']
 
     template = jinja_env.from_string(template_text)
-    return template.render({'foo' : 100})
+    return template.render({'foo' : 200})
