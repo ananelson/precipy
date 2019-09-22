@@ -1,36 +1,44 @@
 from jinja2 import Environment, select_autoescape
+from identifiers import hash_for_fn
+import analytics
+from storage import load_if_cached
 
 # declare 'heavy' resources as globals
-env = Environment(
-    autoescape=select_autoescape(['html', 'xml'])
-)
+jinja_env = None
+
+def init_jinja_env():
+    return Environment(
+            autoescape=select_autoescape(['html', 'xml'])
+            )
 
 def render(request):
-    global env
+    # declare and lazy load globals
+    global jinja_env
+    if jinja_env is None:
+        jinja_env = init_jinja_env()
+    # https://cloud.google.com/functions/docs/bestpractices/tips
 
     request_json = request.get_json()
 
+    # process data sources 
+    for function_name, kwargs in request_json['analytics']:
+        # get function object from function name
+        # TODO generalize module name
+        fn = getattr(analytics, function_name)
+
+        h = hash_for_fn(fn, kwargs)
+        print(h)
+
+        data = load_if_cached("%s.json" % h)
+        print(data)
+
+        # look for report from previous run of this hash
+
+    # render the template
     if request.args and 'template' in request.args:
         template_text = request.template
     elif request_json and 'template' in request_json:
         template_text = request_json['template']
 
-    template = env.from_string(template_text)
+    template = jinja_env.from_string(template_text)
     return template.render({'foo' : 100})
-
-def hello_world(request):
-    """Responds to any HTTP request.
-    Args:
-        request (flask.Request): HTTP request object.
-    Returns:
-        The response text or any set of values that can be turned into a
-        Response object using
-        `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
-    """
-    request_json = request.get_json()
-    if request.args and 'message' in request.args:
-        return request.args.get('message')
-    elif request_json and 'message' in request_json:
-        return request_json['message']
-    else:
-        return f'Hello World!'
