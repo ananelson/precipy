@@ -1,7 +1,7 @@
-from jinja2 import Environment, select_autoescape
 from identifiers import hash_for_fn
-import analytics
+from jinja2 import Environment, select_autoescape
 from storage import load_if_cached
+import analytics
 
 # declare 'heavy' resources as globals
 jinja_env = None
@@ -19,6 +19,7 @@ def render(request):
     # https://cloud.google.com/functions/docs/bestpractices/tips
 
     request_json = request.get_json()
+    bucket_name = request_json.get('bucket_name')
 
     # process data sources 
     for function_name, kwargs in request_json['analytics']:
@@ -29,7 +30,7 @@ def render(request):
         h = hash_for_fn(fn, kwargs)
         print(h)
 
-        data = load_if_cached("%s.json" % h)
+        data = load_if_cached("%s.json" % h, bucket_name)
         print(data)
 
         # look for report from previous run of this hash
