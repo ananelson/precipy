@@ -80,7 +80,7 @@ class Batch(object):
                 plt.savefig(f, dpi=300, bbox_inches='tight')
             cache_path = "%s%s" % (h, filepath.suffix)
             blob = self.storage_bucket.blob(cache_path)
-            blob.upload_from_filename(filepath)
+            blob.upload_from_filename(str(filepath))
 
     def template_text(self):
         return self.info.get("template")
