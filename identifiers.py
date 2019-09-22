@@ -23,8 +23,10 @@ def hash_for_fn(fn, kwargs):
             })
 
 def hash_for_item(canonical_filename):
-    print(inspect.stack())
-    analytics_frameinfo = inspect.stack()[-2]
+    for s in inspect.stack():
+        print("")
+        print(str(s))
+    analytics_frameinfo = inspect.stack()[-3]
     frame = analytics_frameinfo.frame 
 
     args_dict = {

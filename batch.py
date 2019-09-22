@@ -1,4 +1,5 @@
 from google.api_core.exceptions import NotFound
+from identifiers import hash_for_item
 from jinja2 import Environment, select_autoescape
 from google.cloud import storage
 from identifiers import cache_filename_for_fn
@@ -66,10 +67,20 @@ class Batch(object):
             if data is None:
                 # TODO add registered output files + hashes to data
                 data = {}
-                data['function_output']  = fn(**kwargs)
+                data['function_output'] = fn(self, **kwargs)
                 self.save_to_cache(h, data)
 
             self.template_data[function_name] = data
+
+    def save_matplotlib_plt(self, plt, canonical_filename):
+        h = hash_for_item(canonical_filename)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            filepath = Path(tmpdirname) / canonical_filename
+            with open(filepath, 'w+b') as f:
+                plt.savefig(f, dpi=300, bbox_inches='tight')
+            cache_path = "%s%s" % (h, filepath.suffix)
+            blob = self.storage_bucket.blob(cache_path)
+            blob.upload_from_filename(filepath)
 
     def template_text(self):
         return self.info.get("template")

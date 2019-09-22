@@ -1,6 +1,6 @@
 {
     "bucket_name" : "oa_test_2",
-    "template" : "foo is {{ foo }}",
+    "template" : "batch is {{ batch }}",
     "analytics" : [
         ["wavy_line_plot", {"a" : 7, "b" : 4}]
     ]

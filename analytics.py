@@ -1,18 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from identifiers import hash_for_item
-
-def render_plot_to_file(plt, canonical_filename):
-    h = hash_for_item(canonical_filename)
-    print(h)
-    return(h)
 
 #def savegraph(fig, filepath, grid, plot_name, filetype = 'png'):
 #    filepath = Path(filepath) / filename(grid, plot_name, filetype)
 #    with open(filepath, 'w+b') as f:
 #        fig.savefig(f, dpi=300, bbox_inches='tight')
 
-def wavy_line_plot(a, b):
+def wavy_line_plot(batch, a, b):
     x1 = np.linspace(0.0, a)
     x2 = np.linspace(0.0, b)
 
@@ -29,6 +23,6 @@ def wavy_line_plot(a, b):
     plt.xlabel('time (s)')
     plt.ylabel('Undamped')
 
-    render_plot_to_file(plt, "two_subplots.png")
+    batch.save_matplotlib_plt(plt, "two_subplots.png")
 
     return (list(x1), list(y1))
