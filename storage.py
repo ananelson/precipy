@@ -49,7 +49,7 @@ def save_to_cache(h, data, bucket_name=DEFAULT_BUCKET_NAME):
     init_storage(bucket_name)
 
     hashed_filename = cache_filename_for_fn(h)
-    blob = storage_bucket.get_blob(hashed_filename)
+    blob = storage_bucket.blob(hashed_filename)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         fn = Path(tmpdirname) / hashed_filename
