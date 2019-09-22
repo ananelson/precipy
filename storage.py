@@ -55,5 +55,6 @@ def save_to_cache(h, data, bucket_name=DEFAULT_BUCKET_NAME):
         fn = Path(tmpdirname) / hashed_filename
         with open(fn, 'w') as ff:
             json.dump(data, ff)
-        blob.upload_from_filename(fn)
+
+        blob.upload_from_filename(str(fn))
 
