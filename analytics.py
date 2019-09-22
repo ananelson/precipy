@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-#from pathlib import Path
 from identifiers import hash_for_item
+
 
 def render_plot_to_file(plt, canonical_filename):
     h = hash_for_item(canonical_filename)

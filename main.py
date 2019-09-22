@@ -1,6 +1,7 @@
 from identifiers import hash_for_fn
 from jinja2 import Environment, select_autoescape
 from storage import load_if_cached
+from storage import save_to_cache
 import analytics
 
 # declare 'heavy' resources as globals
@@ -28,12 +29,13 @@ def render(request):
         fn = getattr(analytics, function_name)
 
         h = hash_for_fn(fn, kwargs)
-        print(h)
+        data = load_if_cached(h, bucket_name)
 
-        data = load_if_cached("%s.json" % h, bucket_name)
-        print(data)
-
-        # look for report from previous run of this hash
+        if data is None:
+            # TODO add registered output files + hashes to data
+            data = {}
+            data['function_output']  = fn(kwargs)
+            save_to_cache(h, data, bucket_name)
 
     # render the template
     if request.args and 'template' in request.args:
