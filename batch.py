@@ -75,5 +75,6 @@ class Batch(object):
         return self.info.get("template")
 
     def render_template(self):
+        self.template_data['batch'] = self
         template = self.jinja_env.from_string(self.template_text())
         return template.render(self.template_data)
