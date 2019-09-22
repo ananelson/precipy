@@ -34,6 +34,9 @@ def load_if_cached(h, bucket_name=DEFAULT_BUCKET_NAME):
     hashed_filename = cache_filename_for_fn(h)
     blob = storage_bucket.get_blob(hashed_filename)
 
+    if blob is None:
+        return
+
     with tempfile.TemporaryDirectory() as tmpdirname:
         fn = Path(tmpdirname) / hashed_filename
         print(fn)
