@@ -1,6 +1,6 @@
+import batch
 import hashlib
 import inspect
-import batch
 
 def cache_filename_for_fn(h):
     return "%s.json" % h
@@ -12,18 +12,18 @@ def cache_info_for_fn(h):
 def hash_for_dict(info_dict):
     description = u";".join("%s: %s" % (k, v) 
             for k, v in info_dict.items())
-    print(description)
     return hashlib.sha256(description.encode('utf-8')).hexdigest()
 
 def hash_for_fn(fn, kwargs):
     return hash_for_dict({
-            'canonical_filename' : fn.__name__,
-            'batch' : inspect.getsource(batch),
-            'source' : inspect.getsource(fn),
-            'values' : kwargs
+            'canonical_function_name' : fn.__name__,
+            'batch_source' : inspect.getsource(batch),
+            'fn_source' : inspect.getsource(fn),
+            'arg_values' : kwargs
             })
 
 def hash_for_item(canonical_filename):
+    print(inspect.stack())
     analytics_frameinfo = inspect.stack()[-2]
     frame = analytics_frameinfo.frame 
 
