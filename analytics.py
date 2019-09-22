@@ -32,4 +32,4 @@ def wavy_line_plot(a, b):
 
     render_plot_to_file(plt, "two_subplots.png")
 
-    return (x1, y1)
+    return (list(x1), list(y1))
