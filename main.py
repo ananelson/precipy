@@ -1,3 +1,23 @@
+from jinja2 import Environment, select_autoescape
+
+# declare 'heavy' resources as globals
+env = Environment(
+    autoescape=select_autoescape(['html', 'xml'])
+)
+
+def render(request):
+    global env
+
+    request_json = request.get_json()
+
+    if request.args and 'template' in request.args:
+        template_text = request.template
+    elif request_json and 'template' in request_json:
+        template_text = request_json['template']
+
+    template = env.from_string(template_text)
+    return template.render({'foo' : 100})
+
 def hello_world(request):
     """Responds to any HTTP request.
     Args:
