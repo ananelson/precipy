@@ -34,7 +34,7 @@ def render(request):
         if data is None:
             # TODO add registered output files + hashes to data
             data = {}
-            data['function_output']  = fn(kwargs)
+            data['function_output']  = fn(**kwargs)
             save_to_cache(h, data, bucket_name)
 
     # render the template
