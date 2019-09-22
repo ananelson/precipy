@@ -2,3 +2,4 @@ numpy
 seaborn
 pandas
 matplotlib
+google_cloud
