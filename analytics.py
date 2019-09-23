@@ -1,11 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-#def savegraph(fig, filepath, grid, plot_name, filetype = 'png'):
-#    filepath = Path(filepath) / filename(grid, plot_name, filetype)
-#    with open(filepath, 'w+b') as f:
-#        fig.savefig(f, dpi=300, bbox_inches='tight')
-
 def wavy_line_plot(batch, a, b):
     x1 = np.linspace(0.0, a)
     x2 = np.linspace(0.0, b)
