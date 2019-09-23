@@ -1,18 +1,20 @@
 from google.api_core.exceptions import NotFound
-from identifiers import hash_for_item
-from jinja2 import Environment, select_autoescape
 from google.cloud import storage
 from identifiers import cache_filename_for_fn
 from identifiers import hash_for_fn
+from identifiers import hash_for_item
+from jinja2 import Environment, select_autoescape
 from pathlib import Path
 import analytics
 import json
 import tempfile
+import time
 
 DEFAULT_BUCKET_NAME = "artifacts"
 
 class Batch(object):
     def __init__(self, request):
+        self.current_function_name = None
         self.request = request
         self.info = request.get_json()
         self.bucket_name = self.info.get('bucket_name', DEFAULT_BUCKET_NAME)
@@ -57,22 +59,34 @@ class Batch(object):
 
     def generate_analytics(self):
         for function_name, kwargs in self.info.get('analytics', []):
+            self.current_function_name  = function_name
+
             # get function object from function name
             fn = getattr(analytics, function_name)
             # TODO generalize module name beyond hard-coded 'analytics'
 
             h = hash_for_fn(fn, kwargs)
-            data = self.load_if_cached(h)
+            self.current_function_data = self.load_if_cached(h)
 
-            if data is None:
+            if self.current_function_data is  None:
                 # TODO add registered output files + hashes to data
-                data = {}
-                data['function_output'] = fn(self, **kwargs)
-                self.save_to_cache(h, data)
+                self.current_function_data = {}
+                start_time = time.time()
+                self.current_function_data['function_output'] = fn(self, **kwargs)
+                self.current_function_data['function_elapsed_seconds'] = time.time() - start_time
+                self.save_to_cache(h, self.current_function_data)
+            else:
+                self.current_function_data['from_cache'] = True
 
-            self.template_data[function_name] = data
+            self.template_data[function_name] = self.current_function_data
+
+        self.current_function_name = None
+        self.current_function_data = None
 
     def save_matplotlib_plt(self, plt, canonical_filename):
+        if self.current_function_name is None:
+            raise Exception("shouldn't get here")
+
         h = hash_for_item(canonical_filename)
         with tempfile.TemporaryDirectory() as tmpdirname:
             filepath = Path(tmpdirname) / canonical_filename
@@ -81,6 +95,11 @@ class Batch(object):
             cache_path = "%s%s" % (h, filepath.suffix)
             blob = self.storage_bucket.blob(cache_path)
             blob.upload_from_filename(str(filepath))
+
+        if not "files" in self.current_function_data:
+            self.current_function_data['files'] = {}
+
+        self.current_function_data['files'][canonical_filename] = h
 
     def template_text(self):
         return self.info.get("template")

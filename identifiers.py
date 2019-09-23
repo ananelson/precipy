@@ -12,6 +12,10 @@ def cache_info_for_fn(h):
 def hash_for_dict(info_dict):
     description = u";".join("%s: %s" % (k, v) 
             for k, v in info_dict.items())
+    print()
+    print("generatimg hash from")
+    print(description)
+    print()
     return hashlib.sha256(description.encode('utf-8')).hexdigest()
 
 def hash_for_fn(fn, kwargs):
@@ -23,19 +27,17 @@ def hash_for_fn(fn, kwargs):
             })
 
 def hash_for_item(canonical_filename):
-    for s in inspect.stack():
-        print("")
-        print(str(s))
-    analytics_frameinfo = inspect.stack()[-3]
+    analytics_frameinfo = inspect.stack()[2]
     frame = analytics_frameinfo.frame 
 
-    args_dict = {
+    print()
+    print("analytics frame:")
+    print(frame)
+    print()
+
+    return hash_for_dict({
             'canonical_filename' : canonical_filename,
-            'source' : inspect.getsource(frame),
+            'batch_source' : inspect.getsource(batch),
+            'frame_source' : inspect.getsource(frame),
             'values' : inspect.getargvalues(frame)
-            }
-
-    description = u";".join("%s: %s" % (k, v) 
-            for k, v in args_dict.items())
-
-    return hashlib.sha256(description.encode('utf-8')).hexdigest()
+            })
