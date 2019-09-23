@@ -95,6 +95,7 @@ class Batch(object):
             cache_path = "%s%s" % (h, filepath.suffix)
             blob = self.storage_bucket.blob(cache_path)
             blob.upload_from_filename(str(filepath))
+            print(dir(blob))
 
         if not "files" in self.current_function_data:
             self.current_function_data['files'] = {}
