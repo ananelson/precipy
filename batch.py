@@ -3,7 +3,9 @@ from google.cloud import storage
 from identifiers import cache_filename_for_fn
 from identifiers import hash_for_fn
 from identifiers import hash_for_item
-from jinja2 import Environment, select_autoescape
+from jinja2 import Environment
+from jinja2 import select_autoescape
+from jinja2 import FileSystemLoader
 from pathlib import Path
 import analytics
 import json
@@ -20,6 +22,7 @@ class Batch(object):
         self.bucket_name = self.info.get('bucket_name', DEFAULT_BUCKET_NAME)
         self.init_storage()
         self.jinja_env = Environment(
+            loader = FileSystemLoader("templates"),
             autoescape=select_autoescape(['html', 'xml'])
             )
         self.template_data = {}
@@ -100,12 +103,18 @@ class Batch(object):
         if not "files" in self.current_function_data:
             self.current_function_data['files'] = {}
 
+
         self.current_function_data['files'][canonical_filename] = h
 
-    def template_text(self):
-        return self.info.get("template")
+    def create_template(self):
+        if 'template_file' in self.info:
+            print("Loading template fmor file %s"% self.info['template_file'])
+            return self.jinja_env.get_template(self.info['template_file'])
+        else:
+            print("Creating template from string...")
+            return self.jinja_env.from_string(self.info['template'])
 
     def render_template(self):
         self.template_data['batch'] = self
-        template = self.jinja_env.from_string(self.template_text())
+        template = self.create_template()
         return template.render(self.template_data)
