@@ -86,23 +86,26 @@ class Batch(object):
         self.current_function_name = None
         self.current_function_data = None
 
-    def save_matplotlib_plt(self, plt, canonical_filename):
-        if self.current_function_name is None:
-            raise Exception("shouldn't get here")
-
+    def generate_and_upload_file(self, canonical_filename):
         h = hash_for_item(canonical_filename)
         with tempfile.TemporaryDirectory() as tmpdirname:
             filepath = Path(tmpdirname) / canonical_filename
             with open(filepath, 'w+b') as f:
-                plt.savefig(f, dpi=300, bbox_inches='tight')
+                yield h, f
             cache_path = "%s%s" % (h, filepath.suffix)
             blob = self.storage_bucket.blob(cache_path)
             blob.upload_from_filename(str(filepath))
             print(dir(blob))
 
+    def save_matplotlib_plt(self, plt, canonical_filename):
+        if self.current_function_name is None:
+            raise Exception("shouldn't get here")
+
+        for h, f in self.generate_and_upload_file(canonical_filename):
+            plt.savefig(f, dpi=300, bbox_inches='tight')
+
         if not "files" in self.current_function_data:
             self.current_function_data['files'] = {}
-
 
         self.current_function_data['files'][canonical_filename] = h
 
@@ -116,5 +119,19 @@ class Batch(object):
 
     def render_template(self):
         self.template_data['batch'] = self
+        self.template_data['keys'] = self.template_data.keys()
         template = self.create_template()
         return template.render(self.template_data)
+
+    def process_filters(self):
+        for h, f in self.generate_and_upload_file("output.md"):
+            f.write(self.render_template())
+
+        #for filter_opts in self.info['filters']:
+        #    if len(filter_opts) == 2:
+        #        filter_name, output_ext = filter_opts
+        #        filter_args = {}
+        #    else:
+        #        filter_name, output_ext, filter_args = filter_opts
+
+        return h

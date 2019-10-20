@@ -1,5 +1,6 @@
-numpy
-seaborn
-pandas
-matplotlib
 google-cloud-storage
+matplotlib
+numpy
+pandas
+pandoc
+seaborn
