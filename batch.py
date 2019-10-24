@@ -28,7 +28,7 @@ class Batch(object):
         self.bucket_name = self.info.get('bucket_name')
         self.init_storage()
         self.jinja_env = Environment(
-            loader = FileSystemLoader("templates"),
+            loader = FileSystemLoader("templates/"),
             autoescape=select_autoescape(['html', 'xml'])
             )
         self.template_data = {}
@@ -183,8 +183,6 @@ class Batch(object):
         return template.render(self.template_data)
 
     def process_filters(self):
-        os.chdir(self.workdir.name)
-
         # first, process the document template
         prev_filename = "output%s" % self.template_ext
         for h, f in self.generate_and_upload_file(prev_filename):
@@ -200,7 +198,7 @@ class Batch(object):
 
             filter_fn = output_filters.__dict__["do_%s" % filter_name]
             output_filename = "%s.%s" % (h, output_ext)
-            filter_fn(self, prev_filename, output_filename)
+            filter_fn(self, prev_filename, output_filename, output_ext, filter_args)
             print("generated %s" % output_filename)
             self.upload_existing_file(output_filename)
         return output_filename
