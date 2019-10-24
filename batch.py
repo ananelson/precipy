@@ -183,6 +183,8 @@ class Batch(object):
         return template.render(self.template_data)
 
     def process_filters(self):
+        os.chdir(self.workdir.name)
+
         # first, process the document template
         prev_filename = "output%s" % self.template_ext
         for h, f in self.generate_and_upload_file(prev_filename):
