@@ -139,6 +139,7 @@ class Batch(object):
         local_filepath = Path(self.workdir.name) / canonical_filename
         blob = self.storage_bucket.blob(cache_path)
         blob.upload_from_filename(str(local_filepath))
+        return cache_path
 
     def generate_and_upload_file(self, canonical_filename, write_mode='w'):
         h = hash_for_doc(canonical_filename)
@@ -202,7 +203,7 @@ class Batch(object):
             output_filename = "%s.%s" % (h, output_ext)
             filter_fn(self, prev_filename, output_filename, output_ext, filter_args)
             print("generated %s" % output_filename)
-            self.upload_existing_file(output_filename)
+            uploaded_to = self.upload_existing_file(output_filename)
             prev_filename = output_filename
         os.chdir(curdir)
-        return output_filename
+        return uploaded_to
