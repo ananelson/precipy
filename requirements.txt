@@ -3,4 +3,5 @@ matplotlib
 numpy
 pandas
 pandoc
+pypandoc
 seaborn
