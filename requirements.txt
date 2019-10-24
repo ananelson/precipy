@@ -2,5 +2,9 @@ google-cloud-storage
 matplotlib
 numpy
 pandas
-pandoc
 seaborn
+
+# for document filters
+markdown
+pandoc
+Xhtml2pdf

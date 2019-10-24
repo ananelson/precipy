@@ -1,7 +1,7 @@
 {
     "bucket_name" : "oa_test_4",
     "template_file" : "hello.md",
-    "filters" : [["pandoc", "pdf"]],
+    "filters" : [["markdown", "html"], ["xhtml2pdf", "pdf"]],
     "analytics" : [
         ["wavy_line_plot", {"a" : 7, "b" : 4}]
     ]

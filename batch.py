@@ -189,6 +189,8 @@ class Batch(object):
             f.write(self.render_template())
 
         # then, run any filters on the resulting document
+        curdir = os.getcwd()
+        os.chdir(self.workdir.name)
         for filter_opts in self.info.get('filters', []):
             if len(filter_opts) == 2:
                 filter_name, output_ext = filter_opts
@@ -201,4 +203,6 @@ class Batch(object):
             filter_fn(self, prev_filename, output_filename, output_ext, filter_args)
             print("generated %s" % output_filename)
             self.upload_existing_file(output_filename)
+            prev_filename = output_filename
+        os.chdir(curdir)
         return output_filename
