@@ -12,10 +12,12 @@ def cache_info_for_fn(h):
 def hash_for_dict(info_dict):
     description = u";".join("%s: %s" % (k, v) 
             for k, v in info_dict.items())
-    print()
-    print("generatimg hash from")
-    print(description)
-    print()
+    #print()
+    #print("generatimg hash from")
+    #print(sorted(info_dict.keys()))
+    #print("--------------------------------------------------")
+    #print(description)
+    #print()
     return hashlib.sha256(description.encode('utf-8')).hexdigest()
 
 def hash_for_fn(fn, kwargs):
@@ -26,18 +28,18 @@ def hash_for_fn(fn, kwargs):
             'arg_values' : kwargs
             })
 
-def hash_for_item(canonical_filename):
+def hash_for_doc(canonical_filename, hash_args=None):
     analytics_frameinfo = inspect.stack()[2]
     frame = analytics_frameinfo.frame 
 
-    print()
-    print("analytics frame:")
-    print(frame)
-    print()
-
-    return hash_for_dict({
+    d = { 
             'canonical_filename' : canonical_filename,
             'batch_source' : inspect.getsource(batch),
             'frame_source' : inspect.getsource(frame),
-            'values' : inspect.getargvalues(frame)
-            })
+            'values' : inspect.getargvalues(frame).args
+            }
+
+    if hash_args is not None:
+        d.update(hash_args)
+
+    return hash_for_dict(d)
