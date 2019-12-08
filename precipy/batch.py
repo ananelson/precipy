@@ -5,7 +5,7 @@ from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
 from precipy.identifiers import cache_filename_for_fn
-from precipy.identifiers import hash_for_doc
+from precipy.identifiers import hash_for_template
 from precipy.identifiers import hash_for_fn
 import json
 import os
@@ -177,8 +177,9 @@ class Batch(object):
         e.g. save_matplotlib_plt
         """
         local_canonical_filepath = self.outputPath / canonical_filename
-        h = hash_for_doc(canonical_filename)
-        cache_filename = "%s.%s" % (h, canonical_filename.split(".")[1])
+        h = hash_for_template(canonical_filename, self.template_text())
+        ext = os.path.splitext(canonical_filename)[1]
+        cache_filename = "%s%s" % (h, ext)
         local_cache_filepath = self.cachePath / cache_filename
 
         if os.path.exists(local_cache_filepath):
@@ -211,6 +212,14 @@ class Batch(object):
     def save_matplotlib_plt(self, plt, canonical_filename):
         for h, f in self.generate_and_upload_file(canonical_filename, 'wb'):
             plt.savefig(f, dpi=300, bbox_inches='tight')
+
+    # TODO find a nicer way to detect if template file has changed - md5?
+    def template_text(self):
+        if 'template_file' in self.info:
+            with open("templates/%s" % self.info['template_file'], 'r') as f:
+                return f.read()
+        else:
+            return self.info['template']
 
     def create_document_template(self):
         if 'template_file' in self.info:

@@ -24,6 +24,14 @@ def hash_for_fn(fn, kwargs):
             'arg_values' : kwargs
             })
 
+def hash_for_template(template_filename, template_text):
+    d = { 
+            'template_filename' : template_filename,
+            'template_contents' : template_text
+            }
+
+    return hash_for_dict(d)
+
 def hash_for_doc(canonical_filename, hash_args=None):
     analytics_frameinfo = inspect.stack()[2]
     frame = analytics_frameinfo.frame 
