@@ -1,4 +1,6 @@
 google-cloud-storage
+
+# for demo project
 matplotlib
 numpy
 pandas
