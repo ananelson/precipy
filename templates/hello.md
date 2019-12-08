@@ -1,3 +1,10 @@
+<style>
+    @page {
+        size: letter landscape;
+        margin: 2cm;
+    }
+</style>
+
 ## Welcome
 
 This is some text.

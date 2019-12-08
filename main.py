@@ -4,7 +4,6 @@ def render(request):
     batch = Batch(request)
     batch.generate_analytics()
     output = batch.process_filters()
-    batch.cleanup()
     return output
 
 from mock import Request

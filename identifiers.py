@@ -5,10 +5,6 @@ import inspect
 def cache_filename_for_fn(h):
     return "%s.json" % h
 
-def cache_info_for_fn(h):
-    with open(cache_filename_for_fn(h), 'w') as f:
-        f.write()
-
 def hash_for_dict(info_dict):
     description = u";".join("%s: %s" % (k, v) 
             for k, v in info_dict.items())

@@ -1,8 +1,8 @@
 {
-    "bucket_name" : "oa_test_4",
-    "template_file" : "hello.md",
-    "filters" : [["markdown", "html"], ["xhtml2pdf", "pdf"]],
+    "bucket_name" : "oa_test_6",
     "analytics" : [
         ["wavy_line_plot", {"a" : 7, "b" : 4}]
-    ]
+    ],
+    "template_file" : "hello.md",
+    "filters" : [["markdown", "html"], ["xhtml2pdf", "pdf"]]
 }
