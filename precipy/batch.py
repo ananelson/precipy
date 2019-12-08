@@ -10,7 +10,10 @@ from precipy.identifiers import hash_for_fn
 import json
 import os
 import precipy.output_filters as output_filters
+import shutil
+import tempfile
 import time
+from uuid import uuid4
 
 class Batch(object):
     """
@@ -20,35 +23,45 @@ class Batch(object):
     """
 
     def __init__(self, request):
+        self.uuid = str(uuid4())
         self.current_function_name = None
         self.request = request
         self.info = request.get_json()
-        self.bucket_name = self.info.get('bucket_name')
+        self.cache_bucket_name = self.info.get('cache_bucket_name')
+        self.output_bucket_name = self.info.get('output_bucket_name')
         self.init_storage()
         self.jinja_env = Environment(
             loader = FileSystemLoader("templates/"),
             autoescape=select_autoescape(['html', 'xml'])
             )
         self.template_data = {}
-        self.workdir = os.path.abspath("cache/%s" % self.info.get('bucket_name'))
-        self.outdir = "generated"
+        self.template_name = "template.md"
+        self.tempdir = tempfile.gettempdir()
 
-        os.makedirs(self.workdir, exist_ok=True)
-        os.makedirs(self.outdir, exist_ok=True)
+        self.cache_dir = os.path.join(self.tempdir, self.cache_bucket_name)
+        self.output_dir = os.path.join(self.tempdir, self.output_bucket_name, self.uuid)
+        self.cachePath = Path(self.cache_dir)
+        self.outputPath = Path(self.output_dir)
+
+        os.makedirs(self.cache_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
 
         if 'template_file' in self.info:
+            self.template_name = self.info['template_file']
             self.template_ext = os.path.splitext(self.info['template_file'])[1]
         else:
             self.template_ext = ".md"
 
     def init_storage(self):
         self.storage_client = storage.Client()
-        if self.bucket_name is None:
-            raise Exception("must provide a storage bucket name!")
         try:
-            self.storage_bucket = self.storage_client.get_bucket(self.bucket_name)
+            self.cache_storage_bucket = self.storage_client.get_bucket(self.cache_bucket_name)
         except NotFound:
-            self.storage_bucket = self.storage_client.create_bucket(self.bucket_name)
+            self.cache_storage_bucket = self.storage_client.create_bucket(self.cache_bucket_name)
+        try:
+            self.output_storage_bucket = self.storage_client.get_bucket(self.output_bucket_name)
+        except NotFound:
+            self.output_storage_bucket = self.storage_client.create_bucket(self.output_bucket_name)
 
     def check_and_sync_caches(self, cache_filename):
         """
@@ -56,31 +69,33 @@ class Batch(object):
 
         If cache_filename is present in remote cache, ensures it is also available locally.
         """
-        blob = self.storage_bucket.get_blob(cache_filename)
+        blob = self.cache_storage_bucket.get_blob(cache_filename)
 
         if blob is None:
             print("no cached file found for %s" % cache_filename)
             return False
 
-        fn = Path(self.workdir) / cache_filename
+        fn = self.cachePath / cache_filename
         if not os.path.exists(fn):
             print("downloading %s to local cache" % cache_filename)
             blob.download_to_filename(fn)
         else:
             print("cache file already present locally")
 
+        return True
+
     def load_function_data_if_cached(self, h):
         cache_filename = cache_filename_for_fn(h)
         if not self.check_and_sync_caches(cache_filename):
             return
 
-        fn = Path(self.workdir) / cache_filename
+        fn = self.cachePath / cache_filename
         with open(fn, 'r') as ff:
             fn_data = json.load(ff)
 
         for cn, generated_file_info in fn_data['files'].items():
             self.check_and_sync_caches(generated_file_info['cache_file'])
-            local_path = str(Path(self.workdir) / generated_file_info['cache_file'])
+            local_path = str(self.cachePath / generated_file_info['cache_file'])
             # update function metadata with updated value of local_path (which might change between runs)
             fn_data['files'][cn]['local_path'] = local_path
 
@@ -88,9 +103,9 @@ class Batch(object):
 
     def save_function_data(self, h, data):
         hashed_filename = cache_filename_for_fn(h)
-        blob = self.storage_bucket.blob(hashed_filename)
+        blob = self.cache_storage_bucket.blob(hashed_filename)
     
-        fn = Path(self.workdir) / hashed_filename
+        fn = self.cachePath / hashed_filename
         with open(fn, 'w') as ff:
             json.dump(data, ff)
 
@@ -140,14 +155,18 @@ class Batch(object):
         self.current_function_data = None
 
     def upload_existing_file(self, cache_file):
-        print(os.path.abspath(self.workdir))
-        print(os.path.abspath(os.getcwd()))
-        if os.path.abspath(os.getcwd()) == os.path.abspath(self.workdir):
+        if "/" in cache_file:
             local_filepath = cache_file
         else:
-            local_filepath = str(Path(self.workdir) / cache_file)
+            local_filepath = self.cachePath / cache_file
         assert os.path.exists(local_filepath), "no file at %s" % local_filepath
-        blob = self.storage_bucket.blob(cache_file)
+        blob = self.cache_storage_bucket.blob(cache_file)
+        blob.upload_from_filename(str(local_filepath))
+
+    def upload_canonical_file(self, canonical_file):
+        local_filepath = self.outputPath / canonical_file
+        assert os.path.exists(local_filepath), "no file at %s" % local_filepath
+        blob = self.output_storage_bucket.blob(canonical_file)
         blob.upload_from_filename(str(local_filepath))
 
     def generate_and_upload_file(self, canonical_filename, write_mode='w'):
@@ -157,18 +176,24 @@ class Batch(object):
         Wrap this function to provide more specific utility functions,
         e.g. save_matplotlib_plt
         """
+        local_canonical_filepath = self.outputPath / canonical_filename
         h = hash_for_doc(canonical_filename)
-        filepath = Path(self.workdir) / canonical_filename
-        cache_file = "%s%s" % (h, filepath.suffix)
+        cache_filename = "%s.%s" % (h, canonical_filename.split(".")[1])
+        local_cache_filepath = self.cachePath / cache_filename
 
-        if os.path.exists(cache_file):
-            raise Exception("generating a file %s that already exists!" % filepath)
+        if os.path.exists(local_cache_filepath):
+            raise Exception("generating a cache file %s that already exists!" % local_cache_filepath)
 
-        with open(cache_file, write_mode) as f:
+        # yield the cache location so file can be written
+        with open(local_cache_filepath, write_mode) as f:
             yield h, f
-        print("uploading to %s" % cache_file)
-        blob = self.storage_bucket.blob(cache_file)
-        blob.upload_from_filename(str(filepath))
+
+        print("copying from %s to %s" % (local_cache_filepath, local_canonical_filepath))
+        shutil.copyfile(local_cache_filepath, local_canonical_filepath)
+
+        print("uploading to %s" % cache_filename)
+        blob = self.cache_storage_bucket.blob(cache_filename)
+        blob.upload_from_filename(str(local_cache_filepath))
 
         if self.current_function_data is None:
             return
@@ -177,9 +202,9 @@ class Batch(object):
             self.current_function_data['files'] = {}
 
         self.current_function_data['files'][canonical_filename] = {
-                'cache_file' : cache_file,
+                'cache_file' : cache_filename,
                 'canonical_name' : canonical_filename,
-                'local_path' : str(filepath),
+                'local_path' : str(local_canonical_filepath),
                 'url' : blob.public_url
                 }
 
@@ -203,15 +228,21 @@ class Batch(object):
         return template.render(self.template_data)
 
     def process_filters(self):
-        # first, process the document template
-        prev_filename = "output%s" % self.template_ext
+        template_basename = os.path.splitext(self.template_name)[0]
+
+        # write the template to a file on disk
+        # run jinja process
+        prev_filename = self.template_name
+        canonical_filename = prev_filename
+
         for h, f in self.generate_and_upload_file(prev_filename):
             f.write(self.render_template())
 
-        uploaded_to = None
         # then, run any filters on the resulting document
+        # save starting working dir so we can go back later
         curdir = os.getcwd()
-        os.chdir(self.workdir)
+        os.chdir(self.output_dir)
+
         for filter_opts in self.info.get('filters', []):
             if len(filter_opts) == 2:
                 filter_name, output_ext = filter_opts
@@ -220,10 +251,17 @@ class Batch(object):
                 filter_name, output_ext, filter_args = filter_opts
 
             filter_fn = output_filters.__dict__["do_%s" % filter_name]
+            canonical_filename = "%s.%s" % (template_basename, output_ext)
             output_filename = "%s.%s" % (h, output_ext)
             filter_fn(self, prev_filename, output_filename, output_ext, filter_args)
             print("generated %s" % output_filename)
-            uploaded_to = self.upload_existing_file(output_filename)
+
+            # upload cache and canonical files
+            shutil.copyfile(output_filename, self.cachePath / output_filename)
+            self.upload_existing_file(output_filename)
+            shutil.copyfile(output_filename, self.outputPath / canonical_filename)
+            self.upload_canonical_file(canonical_filename)
+
             prev_filename = output_filename
         os.chdir(curdir)
-        return uploaded_to
+        return self.outputPath / canonical_filename
