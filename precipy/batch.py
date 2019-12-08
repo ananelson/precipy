@@ -7,10 +7,9 @@ from pathlib import Path
 from precipy.identifiers import cache_filename_for_fn
 from precipy.identifiers import hash_for_doc
 from precipy.identifiers import hash_for_fn
-import analytics
 import json
 import os
-import output_filters
+import precipy.output_filters as output_filters
 import time
 
 class Batch(object):
@@ -97,13 +96,29 @@ class Batch(object):
 
         blob.upload_from_filename(str(fn))
 
-    def generate_analytics(self):
-        for function_name, kwargs in self.info.get('analytics', []):
-            self.current_function_name  = function_name
+    def get_fn_object(self, module_name, function_name, loaded_modules):
+        for mod in loaded_modules:
+            if module_name != None and mod.__name__ != module_name:
+                print("skipping module name %s" % mod.__name__)
+            else:
+                fn = getattr(mod, function_name)
+                if fn is not None:
+                    return fn
+
+    def generate_analytics(self, analytics_modules):
+        print("args are %s" % str(analytics_modules))
+        for qual_function_name, kwargs in self.info.get('analytics', []):
+            print(qual_function_name)
+            if "." in qual_function_name:
+                module_name, function_name = qual_function_name.split(".")
+            else:
+                module_name = None
+                function_name = qual_function_name
+            self.current_function_name = function_name
 
             # get function object from function name
-            fn = getattr(analytics, function_name)
-            # TODO generalize module name beyond hard-coded 'analytics'
+            fn = self.get_fn_object(module_name, function_name, analytics_modules)
+            print("got fn %s " % str(fn))
 
             h = hash_for_fn(fn, kwargs)
             self.current_function_data = self.load_function_data_if_cached(h)

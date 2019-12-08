@@ -7,6 +7,7 @@ pandas
 seaborn
 
 # for document filters
+jinja2
 markdown
 pandoc
 Xhtml2pdf

@@ -1,4 +1,4 @@
-import batch
+import precipy.batch as batch
 import hashlib
 import inspect
 
