@@ -15,6 +15,14 @@ import tempfile
 import time
 from uuid import uuid4
 
+def read_file_contents(local_path):
+    with open(local_path, 'r') as f:
+        return f.read()
+
+def load_json(local_path):
+    with open(local_path, 'r') as f:
+        return json.load(f)
+
 class Batch(object):
     """
     Encapsulates batch behavior.
@@ -80,7 +88,7 @@ class Batch(object):
             print("downloading %s to local cache" % cache_filename)
             blob.download_to_filename(fn)
         else:
-            print("cache file already present locally")
+            print("cache file %s already present locally" % cache_filename)
 
         return True
 
@@ -123,7 +131,6 @@ class Batch(object):
     def generate_analytics(self, analytics_modules):
         print("args are %s" % str(analytics_modules))
         for qual_function_name, kwargs in self.info.get('analytics', []):
-            print(qual_function_name)
             if "." in qual_function_name:
                 module_name, function_name = qual_function_name.split(".")
             else:
@@ -182,8 +189,8 @@ class Batch(object):
         cache_filename = "%s%s" % (h, ext)
         local_cache_filepath = self.cachePath / cache_filename
 
-        if os.path.exists(local_cache_filepath):
-            raise Exception("generating a cache file %s that already exists!" % local_cache_filepath)
+        #if os.path.exists(local_cache_filepath):
+        #    raise Exception("generating a cache file %s that already exists!" % local_cache_filepath)
 
         # yield the cache location so file can be written
         with open(local_cache_filepath, write_mode) as f:
@@ -203,11 +210,20 @@ class Batch(object):
             self.current_function_data['files'] = {}
 
         self.current_function_data['files'][canonical_filename] = {
+                'ext' : ext,
                 'cache_file' : cache_filename,
                 'canonical_name' : canonical_filename,
                 'local_path' : str(local_canonical_filepath),
                 'url' : blob.public_url
                 }
+
+    def save_plain_text(self, text, canonical_filename):
+        for h, f in self.generate_and_upload_file(canonical_filename, 'w'):
+            f.write(text)
+
+    def save_dict_as_json(self, info, canonical_filename):
+        for h, f in self.generate_and_upload_file(canonical_filename, 'w'):
+            json.dump(info, f)
 
     def save_matplotlib_plt(self, plt, canonical_filename):
         for h, f in self.generate_and_upload_file(canonical_filename, 'wb'):
@@ -233,6 +249,8 @@ class Batch(object):
         self.template_data['batch'] = self
         self.template_data['keys'] = self.template_data.keys()
         self.template_data['data'] = self.template_data
+        self.template_data['read_file_contents'] = read_file_contents
+        self.template_data['load_json'] = load_json
         template = self.create_document_template()
         return template.render(self.template_data)
 

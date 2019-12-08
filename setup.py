@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="precipy",
-    version="0.0.9",
+    version="0.0.10",
     author="Ana Nelson",
     author_email="ana@ananelson.com",
     url="https://github.com/ananelson/precipy",
