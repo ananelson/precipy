@@ -1,4 +1,4 @@
-from main import render
+from precipy.main import render
 
 def test_render_template():
     response = render(MockRequest({

@@ -1,12 +1,12 @@
 from google.api_core.exceptions import NotFound
 from google.cloud import storage
-from identifiers import cache_filename_for_fn
-from identifiers import hash_for_doc
-from identifiers import hash_for_fn
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
+from precipy.identifiers import cache_filename_for_fn
+from precipy.identifiers import hash_for_doc
+from precipy.identifiers import hash_for_fn
 import analytics
 import json
 import os

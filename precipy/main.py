@@ -1,4 +1,4 @@
-from batch import Batch
+from precipy.batch import Batch
 
 def render(request):
     batch = Batch(request)
@@ -6,7 +6,7 @@ def render(request):
     output = batch.process_filters()
     return output
 
-from mock import Request
+from precipy.mock import Request
 import sys
 if __name__ == '__main__':
     render(Request(sys.argv[1]))
