@@ -4,24 +4,21 @@ from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
+from precipy import ReportTemplateException
 from precipy.identifiers import cache_filename_for_fn
-from precipy.identifiers import hash_for_template
 from precipy.identifiers import hash_for_fn
+from precipy.identifiers import hash_for_template
+from uuid import uuid4
+import datetime
 import json
 import os
 import precipy.output_filters as output_filters
 import shutil
 import tempfile
 import time
-from uuid import uuid4
 
-def read_file_contents(local_path):
-    with open(local_path, 'r') as f:
-        return f.read()
+import logging
 
-def load_json(local_path):
-    with open(local_path, 'r') as f:
-        return json.load(f)
 
 class Batch(object):
     """
@@ -60,6 +57,25 @@ class Batch(object):
         else:
             self.template_ext = ".md"
 
+        # set up logging
+        print("setting up logging...")
+        self.logger = logging.getLogger(name="precipy")
+
+        # log to file if specified, else stderr
+        if "logfile" in self.info:
+            handler = logging.FileHandler(self.info['logfile'])
+        else:
+            handler = logging.StreamHandler()
+
+        # default to INFO unless specified
+        level = self.info.get('loglevel', "INFO")
+        handler.setLevel(level)
+        self.logger.setLevel(level)
+        
+        # attach handler
+        logging.getLogger('precipy').addHandler(handler)
+        self.logger.info("logging!")
+
     def init_storage(self):
         self.storage_client = storage.Client()
         try:
@@ -80,15 +96,15 @@ class Batch(object):
         blob = self.cache_storage_bucket.get_blob(cache_filename)
 
         if blob is None:
-            print("no cached file found for %s" % cache_filename)
+            self.logger.info("no remote cached file found for %s" % cache_filename)
             return False
 
         fn = self.cachePath / cache_filename
         if not os.path.exists(fn):
-            print("downloading %s to local cache" % cache_filename)
+            self.logger.info("downloading '%s' to local cache" % cache_filename)
             blob.download_to_filename(fn)
         else:
-            print("cache file %s already present locally" % cache_filename)
+            self.logger.info("cache file %s already present locally" % cache_filename)
 
         return True
 
@@ -103,9 +119,9 @@ class Batch(object):
 
         for cn, generated_file_info in fn_data['files'].items():
             self.check_and_sync_caches(generated_file_info['cache_file'])
-            local_path = str(self.cachePath / generated_file_info['cache_file'])
+            local_cache_path = str(self.cachePath / generated_file_info['cache_file'])
             # update function metadata with updated value of local_path (which might change between runs)
-            fn_data['files'][cn]['local_path'] = local_path
+            fn_data['files'][cn]['local_cache_path'] = local_cache_path
 
         return fn_data
 
@@ -122,15 +138,16 @@ class Batch(object):
     def get_fn_object(self, module_name, function_name, loaded_modules):
         for mod in loaded_modules:
             if module_name != None and mod.__name__ != module_name:
-                print("skipping module name %s" % mod.__name__)
+                pass
             else:
                 fn = getattr(mod, function_name)
                 if fn is not None:
                     return fn
 
     def generate_analytics(self, analytics_modules):
-        print("args are %s" % str(analytics_modules))
-        for qual_function_name, kwargs in self.info.get('analytics', []):
+        self.logger.debug("in generate_analytics with available modules: " + ", ".join(
+            str(m) for m in analytics_modules))
+        for qual_function_name, kwargs in self.info.get('analytics', {}).items():
             if "." in qual_function_name:
                 module_name, function_name = qual_function_name.split(".")
             else:
@@ -140,7 +157,11 @@ class Batch(object):
 
             # get function object from function name
             fn = self.get_fn_object(module_name, function_name, analytics_modules)
-            print("got fn %s " % str(fn))
+            if fn is None:
+                errmsg_raw = "couldn't find a function %s in modules %s"
+                errmsg = errmsg_raw % (function_name, ", ".join(str(m) for m in analytics_modules))
+                raise Exception(errmsg)
+            self.logger.info("matched function %s to fn %s" % (qual_function_name, str(fn)))
 
             h = hash_for_fn(fn, kwargs)
             self.current_function_data = self.load_function_data_if_cached(h)
@@ -156,7 +177,13 @@ class Batch(object):
             else:
                 self.current_function_data['from_cache'] = True
 
-            self.template_data[function_name] = self.current_function_data
+            for filename, file_metadata in self.current_function_data['files'].items():
+                shutil.copyfile(
+                    self.cachePath / file_metadata['cache_file'],
+                    self.outputPath / filename
+                    )
+
+            self.template_data[qual_function_name] = self.current_function_data
 
         self.current_function_name = None
         self.current_function_data = None
@@ -196,10 +223,10 @@ class Batch(object):
         with open(local_cache_filepath, write_mode) as f:
             yield h, f
 
-        print("copying from %s to %s" % (local_cache_filepath, local_canonical_filepath))
-        shutil.copyfile(local_cache_filepath, local_canonical_filepath)
+        assert os.path.exists(local_cache_filepath)
+        shutil.copyfile(local_cache_filepath, self.outputPath / canonical_filename)
 
-        print("uploading to %s" % cache_filename)
+        self.logger.debug("uploading generated %s to %s" % (canonical_filename, cache_filename))
         blob = self.cache_storage_bucket.blob(cache_filename)
         blob.upload_from_filename(str(local_cache_filepath))
 
@@ -213,7 +240,7 @@ class Batch(object):
                 'ext' : ext,
                 'cache_file' : cache_filename,
                 'canonical_name' : canonical_filename,
-                'local_path' : str(local_canonical_filepath),
+                'local_canonical_path' : str(local_canonical_filepath),
                 'url' : blob.public_url
                 }
 
@@ -239,18 +266,29 @@ class Batch(object):
 
     def create_document_template(self):
         if 'template_file' in self.info:
-            print("Loading template from file %s"% self.info['template_file'])
+            self.logger.info("Loading template from file %s"% self.info['template_file'])
             return self.jinja_env.get_template(self.info['template_file'])
         else:
-            print("Creating template from string...")
+            self.logger.info("Creating template from string...")
             return self.jinja_env.from_string(self.info['template'])
 
     def render_template(self):
+        def read_file_contents(path):
+            with open(self.outputPath / path, 'r') as f:
+                return f.read()
+        def load_json(path):
+            with open(self.outputPath / path, 'r') as f:
+                return json.load(f)
+        def fn_params(qual_fn_name, param_name):
+            return self.info['analytics'][qual_fn_name][param_name]
+
         self.template_data['batch'] = self
         self.template_data['keys'] = self.template_data.keys()
         self.template_data['data'] = self.template_data
         self.template_data['read_file_contents'] = read_file_contents
         self.template_data['load_json'] = load_json
+        self.template_data['fn_params'] = fn_params
+        self.template_data['datetime'] = datetime
         template = self.create_document_template()
         return template.render(self.template_data)
 
@@ -262,7 +300,7 @@ class Batch(object):
         prev_filename = self.template_name
         canonical_filename = prev_filename
 
-        for h, f in self.generate_and_upload_file(prev_filename):
+        for h, f in self.generate_and_upload_file(canonical_filename):
             f.write(self.render_template())
 
         # then, run any filters on the resulting document
@@ -281,7 +319,7 @@ class Batch(object):
             canonical_filename = "%s.%s" % (template_basename, output_ext)
             output_filename = "%s.%s" % (h, output_ext)
             filter_fn(self, prev_filename, output_filename, output_ext, filter_args)
-            print("generated %s" % output_filename)
+            self.logger.info("generated %s" % output_filename)
 
             # upload cache and canonical files
             shutil.copyfile(output_filename, self.cachePath / output_filename)
