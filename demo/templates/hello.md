@@ -19,7 +19,7 @@ Here is a list of keys:
 {% for kk, vv in info.items() -%}
      - {{ kk }}: {{ vv }}
 {% endfor -%}
-![Plot]({{ data[k].files[cn]['local_path'] }})
+![Plot]({{ data[k].files[cn]['local_canonical_path'] }})
 {% endfor %}
 {% endif %}
 

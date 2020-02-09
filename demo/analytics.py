@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def wavy_line_plot(batch, a, b):
+def wavy_line_plot(batch, filename, a, b):
     x1 = np.linspace(0.0, a)
     x2 = np.linspace(0.0, b)
 
@@ -18,6 +18,6 @@ def wavy_line_plot(batch, a, b):
     plt.xlabel('time (s)')
     plt.ylabel('Undamped')
 
-    batch.save_matplotlib_plt(plt, "two_subplots.png")
+    batch.save_matplotlib_plt(plt, filename)
 
     return (list(x1), list(y1))

@@ -1,10 +1,16 @@
-from google.api_core.exceptions import NotFound
-from google.cloud import storage
+try:
+    from google.api_core.exceptions import NotFound
+    from google.cloud import storage
+    GOOGLE_CLOUD_AVAILABLE = True
+except Exception as e:
+    print("error loading google cloud functions: %s" % str(e))
+    print("disabling google cloud for now")
+    GOOGLE_CLOUD_AVAILABLE = False
+
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
-from precipy import ReportTemplateException
 from precipy.identifiers import cache_filename_for_fn
 from precipy.identifiers import hash_for_fn
 from precipy.identifiers import hash_for_template
@@ -77,6 +83,10 @@ class Batch(object):
         self.logger.info("logging!")
 
     def init_storage(self):
+        if GOOGLE_CLOUD_AVAILABLE:
+            self.init_google_cloud_storage()
+
+    def init_google_cloud_storage(self):
         self.storage_client = storage.Client()
         try:
             self.cache_storage_bucket = self.storage_client.get_bucket(self.cache_bucket_name)
@@ -147,7 +157,13 @@ class Batch(object):
     def generate_analytics(self, analytics_modules):
         self.logger.debug("in generate_analytics with available modules: " + ", ".join(
             str(m) for m in analytics_modules))
-        for qual_function_name, kwargs in self.info.get('analytics', {}).items():
+        for key, kwargs in self.info.get('analytics', []):
+            if 'function_name' in kwargs:
+                qual_function_name = kwargs['function_name']
+                del kwargs['function_name']
+            else:
+                qual_function_name = key
+
             if "." in qual_function_name:
                 module_name, function_name = qual_function_name.split(".")
             else:
@@ -183,7 +199,7 @@ class Batch(object):
                     self.outputPath / filename
                     )
 
-            self.template_data[qual_function_name] = self.current_function_data
+            self.template_data[key] = self.current_function_data
 
         self.current_function_name = None
         self.current_function_data = None
@@ -329,4 +345,9 @@ class Batch(object):
 
             prev_filename = output_filename
         os.chdir(curdir)
+        if os.path.exists(self.output_bucket_name):
+            print("Folder %s already exists, not copying files. Remove/rename and rerun to copy files to this dir." % self.output_bucket_name)
+        else:
+            print("Copying files to %s" % self.output_bucket_name)
+            shutil.copytree(self.output_dir, self.output_bucket_name)
         return self.outputPath / canonical_filename

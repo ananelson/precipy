@@ -1,7 +1,10 @@
 {
-    "bucket_name" : "oa_test_6",
+    "cache_bucket_name" : "precipy_demo_cache",
+    "output_bucket_name" : "precipy_demo_output",
+    "logfile" : "precipy.log",
     "analytics" : [
-        ["wavy_line_plot", {"a" : 7, "b" : 4}]
+        ["wavy_line_plot", {"filename" : "wavy_7_4.png", "a" : 7, "b" : 4}],
+        ["wavy_line_plot_2", {"function_name" : "wavy_line_plot", "filename" : "wavy_2_3.png", "a" : 2, "b" : 3}]
     ],
     "template_file" : "hello.md",
     "filters" : [["markdown", "html"], ["xhtml2pdf", "pdf"]]

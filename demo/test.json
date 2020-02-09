@@ -1,7 +1,0 @@
-{
-    "bucket_name" : "oa_test_local",
-    "template" : "batch is {{ batch }}",
-    "analytics" : [
-        ["wavy_line_plot", {"a" : 7, "b" : 4}]
-    ]
-}
