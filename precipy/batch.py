@@ -47,15 +47,21 @@ class Batch(object):
             )
         self.template_data = {}
         self.template_name = "template.md"
-        self.tempdir = tempfile.gettempdir()
+
+        if 'tempdir' in self.info:
+            self.tempdir = self.info['tempdir']
+        else:
+            self.tempdir = tempfile.gettempdir()
 
         self.cache_dir = os.path.join(self.tempdir, self.cache_bucket_name)
         self.output_dir = os.path.join(self.tempdir, self.output_bucket_name, self.uuid)
         self.cachePath = Path(self.cache_dir)
         self.outputPath = Path(self.output_dir)
+        self.tempdirOutputPath = Path(self.tempdir) / "output"
 
         os.makedirs(self.cache_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.tempdirOutputPath, exist_ok=True)
 
         if 'template_file' in self.info:
             self.template_name = self.info['template_file']
@@ -224,12 +230,14 @@ class Batch(object):
         assert os.path.exists(local_filepath), "no file at %s" % local_filepath
         blob = self.cache_storage_bucket.blob(cache_file)
         blob.upload_from_filename(str(local_filepath))
+        return blob.public_url
 
     def upload_canonical_file(self, canonical_file):
         local_filepath = self.outputPath / canonical_file
         assert os.path.exists(local_filepath), "no file at %s" % local_filepath
         blob = self.output_storage_bucket.blob(canonical_file)
         blob.upload_from_filename(str(local_filepath))
+        return blob.public_url
 
     def generate_and_upload_file(self, canonical_filename, write_mode='w'):
         """
@@ -254,7 +262,7 @@ class Batch(object):
         assert os.path.exists(local_cache_filepath)
         shutil.copyfile(local_cache_filepath, self.outputPath / canonical_filename)
 
-        self.logger.debug("uploading generated %s to %s" % (canonical_filename, cache_filename))
+        self.logger.debug("uploading generated %s (%s) to %s" % (canonical_filename, local_cache_filepath, cache_filename))
         blob = self.cache_storage_bucket.blob(cache_filename)
         blob.upload_from_filename(str(local_cache_filepath))
 
@@ -330,6 +338,7 @@ class Batch(object):
         return template.render(self.template_data)
 
     def process_filters(self):
+        self.output_documents = []
         template_basename = os.path.splitext(self.template_name)[0]
 
         # write the template to a file on disk
@@ -362,13 +371,23 @@ class Batch(object):
             shutil.copyfile(output_filename, self.cachePath / output_filename)
             self.upload_existing_file(output_filename)
             shutil.copyfile(output_filename, self.outputPath / canonical_filename)
-            self.upload_canonical_file(canonical_filename)
+            document_url = self.upload_canonical_file(output_filename)
+
+            self.output_documents.append({'url' : document_url})
 
             prev_filename = output_filename
+
         os.chdir(curdir)
+
+        # copy files to local folder named output_bucket_name
         if os.path.exists(self.output_bucket_name):
             print("Folder %s already exists, not copying files. Remove/rename and rerun to copy files to this dir." % self.output_bucket_name)
         else:
             print("Copying files to %s" % self.output_bucket_name)
             shutil.copytree(self.output_dir, self.output_bucket_name)
+
+        # copy files to root of tempdir
+        shutil.rmtree(self.tempdirOutputPath)
+        shutil.copytree(self.output_dir, self.tempdirOutputPath)
+
         return self.outputPath / canonical_filename

@@ -1,13 +1,13 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy as np
-import os
 import matplotlib.pyplot as plt
 import time
 
 def generate_data(batch, filename, a, b, n, seed=None):
     if not seed:
         seed = int(time.time())
-    print("random seed is %s " % seed)
-    print(os.getcwd())
     np.random.seed(seed)
     data = np.random.randint(a, b, n)
     assert filename.endswith(".npy"), "use .npy for file extension"

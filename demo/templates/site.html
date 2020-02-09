@@ -1,0 +1,11 @@
+<p>Refresh page to regenerate document.</p>
+
+<a target="_blank" href="{{ editor_url}}">editor</a>
+<br />
+<iframe src="{{ editor_url }} " style="border: thin solid red;" width="800px" height="400px"></iframe>
+
+<div style="margin-top: 20px;" />
+
+<button onclick="var ifr=document.getElementsByName('renderedDocument')[0]; ifr.src=ifr.src;">Reload Frame</button>
+<br />
+<iframe name="renderedDocument" src="{{ rendered_document }}"" style="border:thin solid blue;" width="800px" height=800px"></iframe>

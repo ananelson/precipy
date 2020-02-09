@@ -7,6 +7,8 @@
 
 ## Welcome
 
+Adding some text here too.
+
 This is some text.
 
 Here is a list of keys:
@@ -17,7 +19,7 @@ Here is a list of keys:
 {% for cn, info in data[k].files.items() %}
 - {{ cn  }}
 {% for kk, vv in info.items() -%}
-     - {{ kk }}: {{ vv }}
+     - [{{ kk }}]({{ vv }}) : {{ vv }}
 {% endfor -%}
 {% if data[k].files[cn]['url'].endswith(".png") %}
 ![Plot]({{ data[k].files[cn]['url'] }})
@@ -27,4 +29,3 @@ Here is a list of keys:
 
 
 {% endfor %}
-
