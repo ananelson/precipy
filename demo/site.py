@@ -28,7 +28,6 @@ class PrecipySite(object):
     def index(self):
         response = requests.get(TEMPLATE_URL)
         template_text = response.text
-        print(template_text)
 
         # save a backup in case the online file disappears
         with open(TEMPLATE_BACKUP, 'w') as f:
@@ -40,8 +39,6 @@ class PrecipySite(object):
         batch.process_filters()
 
         site_template = jinja_env.get_template("site.html")
-
-        print(batch.output_documents[-1]['url'])
 
         return site_template.render({
                 "editor_url" : TEMPLATE_EDITOR_URL,
