@@ -32,6 +32,8 @@ If specified, logs will be written to this file. Can also specify `loglevel`.
 
 A list of (key, args) tuples representing functions to be called in the analytics phase of document generation.
 
+Functions will be called in the order listed. Function results will be cached if nothing has changed since the last time they were run. To indicate that a function should be re-run if another function changes, use the 'depends' argument below.
+
 The `key` may be a function name (optionally qualified with `module:function_name` if necessary), or any other unique key. If key is not the function name then `function_name` must be specified in args.
 
 The `args` dict is primarily for specifying named arguments to be passed to the function when called.
