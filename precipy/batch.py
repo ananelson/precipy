@@ -171,6 +171,11 @@ class Batch(object):
                 function_name = qual_function_name
             self.current_function_name = function_name
 
+            if 'depends' in kwargs:
+                depends_on_keys = kwargs['depends']
+                depends_on_hashes = [self.template_data[k]['h'] for k in depends_on_keys]
+                kwargs['depends'] = depends_on_hashes
+
             # get function object from function name
             fn = self.get_fn_object(module_name, function_name, analytics_modules)
             if fn is None:
@@ -180,6 +185,12 @@ class Batch(object):
             self.logger.info("matched function %s to fn %s" % (qual_function_name, str(fn)))
 
             h = hash_for_fn(fn, kwargs)
+
+            if 'depends' in kwargs:
+                del kwargs['depends']
+
+            self.logger.debug("hash for fn %s is %s" % (fn, h))
+
             self.current_function_data = self.load_function_data_if_cached(h)
 
             if self.current_function_data is None:
@@ -187,13 +198,14 @@ class Batch(object):
                 start_time = time.time()
                 # run the actual function
                 output = fn(self, **kwargs)
+                self.current_function_data['h'] = h
                 self.current_function_data['function_elapsed_seconds'] = time.time() - start_time
                 self.current_function_data['function_output'] = output
                 self.save_function_data(h, self.current_function_data)
             else:
                 self.current_function_data['from_cache'] = True
 
-            for filename, file_metadata in self.current_function_data['files'].items():
+            for filename, file_metadata in self.current_function_data.get('files', {}).items():
                 shutil.copyfile(
                     self.cachePath / file_metadata['cache_file'],
                     self.outputPath / filename
@@ -267,6 +279,15 @@ class Batch(object):
     def save_dict_as_json(self, info, canonical_filename):
         for h, f in self.generate_and_upload_file(canonical_filename, 'w'):
             json.dump(info, f)
+
+    def save_binary(self, canonical_filename):
+        for h, f in self.generate_and_upload_file(canonical_filename, 'wb'):
+            yield(h, f)
+
+    def read_binary(self, canonical_filename):
+        self.logger.debug("opening file %s in dir %s" % (canonical_filename, self.outputPath))
+        with open(self.outputPath / canonical_filename, 'rb') as f:
+            yield f
 
     def save_matplotlib_plt(self, plt, canonical_filename):
         for h, f in self.generate_and_upload_file(canonical_filename, 'wb'):

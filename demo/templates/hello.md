@@ -19,7 +19,9 @@ Here is a list of keys:
 {% for kk, vv in info.items() -%}
      - {{ kk }}: {{ vv }}
 {% endfor -%}
+{% if data[k].files[cn]['local_canonical_path'].endswith(".png") %}
 ![Plot]({{ data[k].files[cn]['local_canonical_path'] }})
+{% endif %}
 {% endfor %}
 {% endif %}
 

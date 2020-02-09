@@ -2,9 +2,11 @@
     "cache_bucket_name" : "precipy_demo_cache",
     "output_bucket_name" : "precipy_demo_output",
     "logfile" : "precipy.log",
+    "loglevel" : "DEBUG",
     "analytics" : [
-        ["wavy_line_plot", {"filename" : "wavy_7_4.png", "a" : 7, "b" : 4}],
-        ["wavy_line_plot_2", {"function_name" : "wavy_line_plot", "filename" : "wavy_2_3.png", "a" : 2, "b" : 3}]
+        ["generate_data", {"filename" : "random_0_100.npy", "seed" : 1002, "a" : 0, "b" : 101, "n" : 10}],
+        ["generate_data_1000", {"function_name" : "generate_data", "filename" : "random_0_1000.npy", "a" : 0, "b" : 1000, "n" : 10}],
+        ["plot_values", {"depends" : ["generate_data"], "input_filename" : "random_0_100.npy", "c" : 40, "n" : 10, "output_filename" : "plot_with_overlay_30.png" }]
     ],
     "template_file" : "hello.md",
     "filters" : [["markdown", "html"], ["xhtml2pdf", "pdf"]]
