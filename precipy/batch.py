@@ -317,7 +317,7 @@ class Batch(object):
             self.logger.info("Creating template from string...")
             return self.jinja_env.from_string(self.info['template'])
 
-    def render_template(self):
+    def setup_template_environment(self):
         def read_file_contents(path):
             with open(self.outputPath / path, 'r') as f:
                 return f.read()
@@ -334,7 +334,14 @@ class Batch(object):
         self.template_data['load_json'] = load_json
         self.template_data['fn_params'] = fn_params
         self.template_data['datetime'] = datetime
+
+    def render_template(self):
+        self.setup_template_environment()
         template = self.create_document_template()
+        return template.render(self.template_data)
+
+    def render_alternate_template(self, template_name):
+        template = self.jinja_env.get_template(template_name)
         return template.render(self.template_data)
 
     def process_filters(self):

@@ -7,25 +7,10 @@
 
 ## Welcome
 
-Adding some text here too.
-
 This is some text.
 
-Here is a list of keys:
-{% for k in keys %}
-### {{ k }}
+Here is a plot you should check out:
 
-{% if data[k].files is defined %}
-{% for cn, info in data[k].files.items() %}
-- {{ cn  }}
-{% for kk, vv in info.items() -%}
-     - [{{ kk }}]({{ vv }}) : {{ vv }}
-{% endfor -%}
-{% if data[k].files[cn]['url'].endswith(".png") %}
-![Plot]({{ data[k].files[cn]['url'] }})
-{% endif %}
-{% endfor %}
-{% endif %}
+<img src="{{ data['plot_values']['files']['plot_with_overlay_30.png']['url'] }}"  style="width: 300px;" />
 
 
-{% endfor %}

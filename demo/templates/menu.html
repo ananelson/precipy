@@ -1,0 +1,37 @@
+<h3>Keys</h3>
+{% for k in keys %}
+{% if k not in ["data"] %}
+<h4>{{ k }}</h4>
+
+{% if data[k].items is defined %}
+<table>
+    {% for kk, vv in data[k].items() %}
+    {% if kk not in ["files"] %}
+    <tr>
+        <td>{{ kk }}</td>
+        <td><input class="copyable" value="{{ "{{data['" + k + "']['" + kk + "']" + "}}" }}" /></td>
+        <td>{{ vv }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+</table>
+{% endif %}
+
+{% if data[k].files is defined %}
+<ul>
+    {% for cn, info in data[k].files.items() %}
+    <li>file: {{ cn  }}</li>
+    <table>
+        {% for kk, vv in info.items() -%}
+        <tr>
+            <td>{{ kk }}</td>
+            <td><input class="copyable" value="{{ "{{data['" + k + "']['files']['" + cn + "']['" + kk + "']" + "}}" }}" /></td>
+            <td>{{ vv }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endfor -%}
+</ul>
+{% endif %}
+{% endif %}
+{% endfor %}

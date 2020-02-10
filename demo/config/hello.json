@@ -1,7 +1,7 @@
 {
     "cache_bucket_name" : "precipy_demo_cache",
     "output_bucket_name" : "precipy_demo_output",
-    "logfile" : "precipy.log",
+    "logfile" : "logs/precipy.log",
     "loglevel" : "DEBUG",
     "analytics" : [
         ["generate_data", {"filename" : "random_0_100.npy", "seed" : 1002, "a" : 0, "b" : 101, "n" : 10}],
