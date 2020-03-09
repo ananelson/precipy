@@ -11,3 +11,4 @@ jinja2
 markdown
 pandoc
 Xhtml2pdf
+weasyprint
