@@ -11,8 +11,6 @@ setuptools.setup(
         "google-cloud-storage",
         "jinja2",
         "markdown",
-        "pandoc",
-        "Xhtml2pdf"
         ],
     classifiers=[
         "Programming Language :: Python :: 3",
