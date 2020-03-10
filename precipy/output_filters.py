@@ -5,8 +5,6 @@ import markdown
 import os
 
 def do_markdown(batch, input_filepath, output_filepath, output_ext, filter_args):
-    print("in do_markdown with input %s output %s" % (input_filepath, output_filepath))
-    print(os.getcwd())
     with open(input_filepath, 'r') as i_f:
         with open(output_filepath, 'w') as o_f:
             html = markdown.markdown(i_f.read())

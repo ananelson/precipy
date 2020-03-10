@@ -9,5 +9,6 @@
         ["plot_values", {"depends" : ["generate_data"], "input_filename" : "random_0_100.npy", "c" : 40, "n" : 10, "output_filename" : "plot_with_overlay_30.png" }]
     ],
     "template_file" : "hello.md",
+    "output_basename" : "hello_{{ generate_data_1000['b'] }}",
     "filters" : [["markdown", "html"], ["weasyprint", "pdf"]]
 }

@@ -344,6 +344,10 @@ class Batch(object):
         template = self.jinja_env.get_template(template_name)
         return template.render(self.template_data)
 
+    def render_filename(self):
+        template = self.jinja_env.from_string(self.info['output_basename'])
+        return template.render(self.info['analytics'])
+
     def process_filters(self):
         self.output_documents = []
         template_basename = os.path.splitext(self.template_name)[0]
@@ -355,6 +359,9 @@ class Batch(object):
 
         for h, f in self.generate_and_upload_file(canonical_filename):
             f.write(self.render_template())
+
+        if self.info.get("output_basename"):
+            canonical_filename = self.render_filename()
 
         # then, run any filters on the resulting document
         # save starting working dir so we can go back later
