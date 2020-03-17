@@ -256,8 +256,11 @@ class Batch(object):
         #    raise Exception("generating a cache file %s that already exists!" % local_cache_filepath)
 
         # yield the cache location so file can be written
-        with open(local_cache_filepath, write_mode) as f:
-            yield h, f
+        if write_mode is None:
+            yield local_cache_filepath
+        else:
+            with open(local_cache_filepath, write_mode) as f:
+                yield h, f
 
         assert os.path.exists(local_cache_filepath)
         shutil.copyfile(local_cache_filepath, self.outputPath / canonical_filename)
@@ -291,6 +294,9 @@ class Batch(object):
     def save_binary(self, canonical_filename):
         for h, f in self.generate_and_upload_file(canonical_filename, 'wb'):
             yield(h, f)
+
+    def working_path_to_file(self, canonical_filename):
+        return self.outputPath / canonical_filename
 
     def read_binary(self, canonical_filename):
         self.logger.debug("opening file %s in dir %s" % (canonical_filename, self.outputPath))
