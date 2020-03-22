@@ -1,0 +1,4 @@
+docs/*.md|jinja|markdown|easyhtml:
+    - precipy/*.py|pydoc:
+        - precipy/*.py:
+            output: False

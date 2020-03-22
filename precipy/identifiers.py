@@ -1,28 +1,28 @@
-import precipy.batch as batch
 import hashlib
 import inspect
 
-def cache_filename_for_fn(h):
-    return "%s.json" % h
-
 def hash_for_dict(info_dict):
-    description = u";".join("%s: %s" % (k, v) 
-            for k, v in info_dict.items())
-    #print()
-    #print("generatimg hash from")
-    #print(sorted(info_dict.keys()))
-    #print("--------------------------------------------------")
-    #print(description)
-    #print()
+    description = u";".join("%s: %s" % (k, info_dict)
+            for k in sorted(info_dict))
     return hashlib.sha256(description.encode('utf-8')).hexdigest()
 
-def hash_for_fn(fn, kwargs):
+def hash_for_fn(fn, kwargs, depends=None):
+    import precipy.batch as batch
+    import precipy.analytics_function as analytics_function
     return hash_for_dict({
             'canonical_function_name' : fn.__name__,
-            'batch_source' : inspect.getsource(batch),
             'fn_source' : inspect.getsource(fn),
-            'arg_values' : kwargs
+            'depends' : depends,
+            'arg_values' : kwargs,
+            'batch_source' : inspect.getsource(batch),
+            'analytics_function_source' : inspect.getsource(analytics_function)
             })
+
+def hash_for_supplemental_file(canonical_filename, fn_h):
+    return hash_for_dict({
+        "fn_hash" : fn_h,
+        "filename" : canonical_filename
+        })
 
 def hash_for_template(template_filename, template_text):
     d = { 
@@ -33,6 +33,7 @@ def hash_for_template(template_filename, template_text):
     return hash_for_dict(d)
 
 def hash_for_doc(canonical_filename, hash_args=None):
+    import precipy.batch as batch
     analytics_frameinfo = inspect.stack()[2]
     frame = analytics_frameinfo.frame 
 
