@@ -52,6 +52,29 @@ class Storage(object):
         """
         pass
 
+    def reset_output(self):
+        """
+        Deletes and re-creates the output directory.
+        """
+        pass
+
+    def upload_output(self, canonical_filename, cache_filepath):
+        """
+        Uploads the file cached at cache_filepath to storage.
+
+        Should raise an exception if the file at cache_filepath does not exist.
+
+        Should return public_url to the file in storage if successful.
+        """
+        return self._upload_cache(canonical_filename, cache_filepath)
+
+    def _upload_output(self, canonical_filename, cache_filepath):
+        """
+        Implement this method in subclass
+        """
+        pass
+
+
 class GoogleCloudStorage(Storage):
     def find_or_create_bucket(self, bucket_name):
         try:
@@ -72,3 +95,12 @@ class GoogleCloudStorage(Storage):
     def _download_cache(self, cache_filename, cache_filepath):
         blob = self.cache_storage_bucket.blob(cache_filename)
         blob.download_to_filename(cache_filepath)
+
+    def reset_output(self):
+        self.storage_client.delete_bucket(self.output_bucket_name)
+        self.output_storage_bucket = self.storage_client.create_bucket(self.output_bucket_name)
+
+    def _upload_output(self, canonical_filename, cache_filepath):
+        blob = self.cache_storage_bucket.blob(canonical_filename)
+        blob.upload_from_filename(str(cache_filepath))
+        return blob.public_url

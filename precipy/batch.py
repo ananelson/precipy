@@ -2,7 +2,7 @@ from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
-from precipy.identifiers import hash_for_template
+from precipy.identifiers import hash_for_template_text
 from precipy.analytics_function import AnalyticsFunction
 from uuid import uuid4
 import datetime
@@ -22,6 +22,7 @@ class Batch(object):
         self.setup_work_dirs()
         self.setup_document_template()
         self.setup_storages()
+        self.functions = {}
 
     def setup_storages(self):
         self.storages = self.config.get('storages', [])
@@ -51,9 +52,12 @@ class Batch(object):
         self.tempdir = Path(self.config.get('tempdir', tempfile.gettempdir())) / "precipy"
 
         self.cachePath = self.tempdir / self.cache_bucket_name
-        self.outputPath = self.tempdir / self.output_bucket_name / self.uuid
+        self.templateWorkPath = self.tempdir / self.output_bucket_name / self.uuid
+        self.outputPath = self.tempdir / self.output_bucket_name / "output"
 
         os.makedirs(self.cachePath, exist_ok=True)
+        os.makedirs(self.templateWorkPath, exist_ok=True)
+        shutil.rmtree(self.outputPath, ignore_errors=True)
         os.makedirs(self.outputPath, exist_ok=True)
 
     def setup_document_template(self):
@@ -111,6 +115,7 @@ class Batch(object):
             if not af.function_output:
                 af.load_metadata()
 
+        self.functions[key] = af
         return af.h
 
     def resolve_function(self, key, kwargs, previous_functions):
@@ -153,36 +158,6 @@ class Batch(object):
                 if fn is not None:
                     return fn
 
-    def save_function_data(self, h, data):
-        hashed_filename = cache_filename_for_fn(h)
-        if GOOGLE_CLOUD_AVAILABLE:
-            blob = self.cache_storage_bucket.blob(hashed_filename)
-    
-        fn = self.cachePath / hashed_filename
-        with open(fn, 'w') as ff:
-            json.dump(data, ff)
-
-        if GOOGLE_CLOUD_AVAILABLE:
-            blob.upload_from_filename(str(fn))
-
-
-    def upload_existing_file(self, cache_file):
-        if "/" in cache_file:
-            local_filepath = cache_file
-        else:
-            local_filepath = self.cachePath / cache_file
-        assert os.path.exists(local_filepath), "no file at %s" % local_filepath
-        blob = self.cache_storage_bucket.blob(cache_file)
-        blob.upload_from_filename(str(local_filepath))
-        return blob.public_url
-
-    def upload_canonical_file(self, canonical_file):
-        local_filepath = self.outputPath / canonical_file
-        assert os.path.exists(local_filepath), "no file at %s" % local_filepath
-        blob = self.output_storage_bucket.blob(canonical_file)
-        blob.upload_from_filename(str(local_filepath))
-        return blob.public_url
-
     # TODO find a nicer way to detect if template file has changed - md5?
     def template_text(self):
         if 'template_file' in self.config:
@@ -210,8 +185,10 @@ class Batch(object):
             return self.config['analytics'][qual_fn_name][param_name]
 
         self.template_data['batch'] = self
-        self.template_data['keys'] = self.template_data.keys()
-        self.template_data['data'] = self.template_data
+        self.template_data['keys'] = self.functions.keys()
+        self.template_data['data'] = self.functions
+
+        # functions/modules for use within templates
         self.template_data['read_file_contents'] = read_file_contents
         self.template_data['load_json'] = load_json
         self.template_data['fn_params'] = fn_params
@@ -239,16 +216,19 @@ class Batch(object):
         prev_filename = self.template_name
         canonical_filename = prev_filename
 
-        for h, f in self.generate_and_upload_file(canonical_filename):
-            f.write(self.render_template())
-
         if self.config.get("output_basename"):
             canonical_filename = self.render_filename()
+
+        h = hash_for_template_text(self.template_text())
+
+        work_filepath = self.templateWorkPath / canonical_filename
+        with open(work_filepath, 'w') as f:
+            f.write(self.render_template())
 
         # then, run any filters on the resulting document
         # save starting working dir so we can go back later
         curdir = os.getcwd()
-        os.chdir(self.outputPath)
+        os.chdir(self.templateWorkPath)
 
         for filter_opts in self.config.get('filters', []):
             if len(filter_opts) == 2:
@@ -259,36 +239,16 @@ class Batch(object):
 
             filter_fn = output_filters.__dict__["do_%s" % filter_name]
             canonical_filename = "%s.%s" % (template_basename, output_ext)
-            output_filename = "%s.%s" % (h, output_ext)
-            filter_fn(self, prev_filename, output_filename, output_ext, filter_args)
-            self.logger.info("generated %s" % output_filename)
+            result_filename = "%s.%s" % (h, output_ext)
+            cache_filepath = self.cachePath / result_filename
 
-            # upload cache and canonical files
-            shutil.copyfile(output_filename, self.cachePath / output_filename)
-            if GOOGLE_CLOUD_AVAILABLE:
-                self.upload_existing_file(output_filename)
+            filter_fn(self, prev_filename, result_filename, output_ext, filter_args)
+            self.logger.info("generated %s" % result_filename)
 
-            shutil.copyfile(output_filename, self.outputPath / canonical_filename)
-
-            if GOOGLE_CLOUD_AVAILABLE:
-                document_url = self.upload_canonical_file(output_filename)
-                self.output_documents.append({'url' : document_url})
-
-            prev_filename = output_filename
+            shutil.copyfile(result_filename, cache_filepath)
+            prev_filename = result_filename
+            work_filepath = self.templateWorkPath / prev_filename
 
         os.chdir(curdir)
 
-        # copy files to local folder named output_bucket_name
-        if os.path.exists(self.output_bucket_name):
-            print("Folder %s already exists, not copying files. Remove/rename and rerun to copy files to this dir." % self.output_bucket_name)
-        else:
-            print("Copying files to %s" % self.output_bucket_name)
-            shutil.copytree(self.outputPath, self.output_bucket_name)
-
-        # copy files to root of tempdir
-        shutil.rmtree(self.tempdirOutputPath, ignore_errors=True)
-        if os.path.exists(self.outputPath):
-            print("about to copy files from %s" % self.outputPath)
-            shutil.copytree(self.outputPath, self.tempdirOutputPath)
-
-        return self.outputPath / canonical_filename
+        return work_filepath

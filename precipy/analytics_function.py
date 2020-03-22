@@ -32,7 +32,7 @@ class AnalyticsFunction(object):
         self.generate_hash(self.fn, self.kwargs)
         self.set_cache_path(cachePath)
         self.setup_supplemental_files()
-
+        self.function_output = None
         self.previous_functions = previous_functions or []
         self.storages = storages or []
 

@@ -24,13 +24,20 @@ def hash_for_supplemental_file(canonical_filename, fn_h):
         "filename" : canonical_filename
         })
 
-def hash_for_template(template_filename, template_text):
-    d = { 
-            'template_filename' : template_filename,
-            'template_contents' : template_text
-            }
+def hash_for_template_text(text):
+    m = hashlib.sha256()
+    m.update(text.encode('utf-8'))
+    return hash_for_dict({
+        "template_contents" : m.hexdigest()
+        })
 
-    return hash_for_dict(d)
+def hash_for_template_file(filepath):
+    m = hashlib.sha256()
+    with open(filepath, 'r') as f:
+        m.update(f.read().encode('utf-8'))
+    return hash_for_dict({
+        "template_contents" : m.hexdigest()
+        })
 
 def hash_for_doc(canonical_filename, hash_args=None):
     import precipy.batch as batch
