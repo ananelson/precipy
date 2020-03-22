@@ -29,11 +29,11 @@ class AnalyticsFunction(object):
         """
         self.fn = fn
         self.kwargs = kwargs
+        self.previous_functions = previous_functions or []
         self.generate_hash(self.fn, self.kwargs)
         self.set_cache_path(cachePath)
         self.setup_supplemental_files()
         self.function_output = None
-        self.previous_functions = previous_functions or []
         self.storages = storages or []
 
     def generate_hash(self, fn, kwargs):
@@ -44,7 +44,7 @@ class AnalyticsFunction(object):
         self.depends_function_hashes = None
         if 'depends' in kwargs:
             self.depends_function_keys = kwargs['depends']
-            self.depends_function_hashes = [self.template_data[k]['h'] for k in self.depends]
+            self.depends_function_hashes = [self.previous_functions[k] for k in self.depends_function_keys]
             del kwargs['depends']
 
         self.h = hash_for_fn(fn, kwargs, self.depends_function_hashes)
@@ -144,13 +144,15 @@ class AnalyticsFunction(object):
         shutil.copyfile(filepath, cache_filepath)
         self.append_supplemental_file(canonical_filename)
 
-    def read_file(self, canonical_filename, fn_key=None, mode='r'):
+    def path_to_cached_file(self, canonical_filename, fn_key=None):
         if fn_key:
             fn_h = self.previous_functions[fn_key]
         else:
             fn_h = self.h
-    
-        cache_filepath = self.supplemental_file_cache_filepath(canonical_filename, fn_h)
+        return self.supplemental_file_cache_filepath(canonical_filename, fn_h)
+
+    def read_file(self, canonical_filename, fn_key=None, mode='r'):
+        cache_filepath = self.path_to_cached_file(canonical_filename, fn_key) 
         with open(cache_filepath, mode) as f:
             yield f
 
