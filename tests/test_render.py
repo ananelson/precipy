@@ -11,6 +11,7 @@ def test_render_data():
             ]
         }
 
-    output_filename = render_data(config, analytics_modules=[tests.analytics])
+    batch = render_data(config, analytics_modules=[tests.analytics])
+    output_filename = batch.files
     with open(output_filename, 'r') as f:
         assert f.read() == "a is 7"

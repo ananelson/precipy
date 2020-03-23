@@ -1,5 +1,22 @@
 import hashlib
 import inspect
+from enum import Enum
+import os
+
+class FileType(Enum):
+    ANALYTICS = "analytics"
+    METADATA = "metadata"
+    TEMPLATE = "template"
+    DOCUMENT = "document"
+
+class GeneratedFile(object):
+    def __init__(self, canonical_filename, h, file_type=FileType.ANALYTICS, cache_filepath=None):
+        self.canonical_filename = canonical_filename
+        self.h = h
+        self.file_type = file_type
+        self.cache_filepath = cache_filepath
+        self.ext = os.path.splitext(canonical_filename)[1]
+        self.public_urls = []
 
 def hash_for_dict(info_dict):
     description = u";".join("%s: %s" % (k, info_dict)
@@ -25,19 +42,22 @@ def hash_for_supplemental_file(canonical_filename, fn_h):
         })
 
 def hash_for_template_text(text):
-    m = hashlib.sha256()
+    m = hashlib.md5()
     m.update(text.encode('utf-8'))
-    return hash_for_dict({
-        "template_contents" : m.hexdigest()
-        })
+    return m.hexdigest()
 
 def hash_for_template_file(filepath):
-    m = hashlib.sha256()
-    with open(filepath, 'r') as f:
-        m.update(f.read().encode('utf-8'))
-    return hash_for_dict({
-        "template_contents" : m.hexdigest()
-        })
+    m = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        m.update(f.read())
+    return m.hexdigest()
+
+def hash_for_document(template_hash, filter_name, filter_ext, filter_args):
+    x = { "template_hash" : template_hash,
+          "filter_name" : filter_name,
+          "filter_ext" : filter_ext}
+    x.update(filter_args)
+    return hash_for_dict(x)
 
 def hash_for_doc(canonical_filename, hash_args=None):
     import precipy.batch as batch

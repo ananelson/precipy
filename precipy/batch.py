@@ -2,8 +2,12 @@ from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
-from precipy.identifiers import hash_for_template_text
 from precipy.analytics_function import AnalyticsFunction
+from precipy.identifiers import FileType
+from precipy.identifiers import GeneratedFile
+from precipy.identifiers import hash_for_template_text
+from precipy.identifiers import hash_for_template_file
+from precipy.identifiers import hash_for_document
 from uuid import uuid4
 import datetime
 import json
@@ -13,22 +17,28 @@ import precipy.output_filters as output_filters
 import shutil
 import tempfile
 
-
 class Batch(object):
     def __init__(self, config):
         self.config = config
-        self.uuid = str(uuid4())
+        self.h = str(uuid4())
         self.setup_logging()
         self.setup_work_dirs()
-        self.setup_document_template()
+        self.setup_template_environment()
+        self.setup_document_templates()
         self.setup_storages()
         self.functions = {}
+        self.documents = {}
 
     def setup_storages(self):
         self.storages = self.config.get('storages', [])
         for storage in self.storages:
             storage.init(self)
             storage.connect()
+
+    def upload_to_storages(self, canonical_filename, cache_filepath):
+        for storage in self.storages:
+            public_url = storage.upload_cache(cache_filepath)
+            self.documents[canonical_filename].public_urls.append(public_url)
 
     def setup_logging(self):
         self.logger = logging.getLogger(name="precipy")
@@ -52,15 +62,13 @@ class Batch(object):
         self.tempdir = Path(self.config.get('tempdir', tempfile.gettempdir())) / "precipy"
 
         self.cachePath = self.tempdir / self.cache_bucket_name
-        self.templateWorkPath = self.tempdir / self.output_bucket_name / self.uuid
         self.outputPath = self.tempdir / self.output_bucket_name / "output"
 
         os.makedirs(self.cachePath, exist_ok=True)
-        os.makedirs(self.templateWorkPath, exist_ok=True)
         shutil.rmtree(self.outputPath, ignore_errors=True)
         os.makedirs(self.outputPath, exist_ok=True)
 
-    def setup_document_template(self):
+    def setup_template_environment(self):
         template_dir = self.config.get('template_dir', "templates")
 
         self.jinja_env = Environment(
@@ -69,12 +77,16 @@ class Batch(object):
 
         self.template_data = {}
 
-        if 'template_file' in self.config:
-            self.template_name = self.config['template_file']
-            self.template_ext = os.path.splitext(self.config['template_file'])[1]
-        else:
-            self.template_name = "template.md"
-            self.template_ext = ".md"
+    def setup_document_templates(self):
+        self.template_filenames = []
+        self.template_filenames += self.config.get("templates", [])
+        self.template_filenames += self.config.get("template_files", [])
+        if self.config.get("tempalte_file"):
+            self.template_filenames += [self.config["template_file"]]
+
+        if "template" in self.config:
+            # template content is embedded in config - mostly used for testing
+            self.template_filenames += ["%s.md" % self.h]
 
     ## Analytics
 
@@ -103,7 +115,6 @@ class Batch(object):
                 af.load_metadata()
                 for sf in af.supplemental_files:
                     filepath = af.supplemental_file_cache_filepath(sf.canonical_filename)
-                    print("downloading file for %s" % filepath)
                     if not self.download_from_storages(filepath):
                         raise Exception("Couldn't download storage for %s" % filepath)
 
@@ -158,23 +169,7 @@ class Batch(object):
                 if fn is not None:
                     return fn
 
-    # TODO find a nicer way to detect if template file has changed - md5?
-    def template_text(self):
-        if 'template_file' in self.config:
-            with open("templates/%s" % self.config['template_file'], 'r') as f:
-                return f.read()
-        else:
-            return self.config['template']
-
-    def create_document_template(self):
-        if 'template_file' in self.config:
-            self.logger.info("Loading template from file %s"% self.config['template_file'])
-            return self.jinja_env.get_template(self.config['template_file'])
-        else:
-            self.logger.info("Creating template from string...")
-            return self.jinja_env.from_string(self.config['template'])
-
-    def setup_template_environment(self):
+    def populate_template_data(self):
         def read_file_contents(path):
             with open(self.outputPath / path, 'r') as f:
                 return f.read()
@@ -194,61 +189,96 @@ class Batch(object):
         self.template_data['fn_params'] = fn_params
         self.template_data['datetime'] = datetime
 
-    def render_template(self):
-        self.setup_template_environment()
-        template = self.create_document_template()
-        return template.render(self.template_data)
+    def copy_all_supplemental_files(self):
+        """
+        Copies all supplemental files to the current working directory.
+        """
+        for af in self.functions.values():
+            for gf in af.files.values():
+                shutil.copyfile(gf.cache_filepath, gf.canonical_filename)
 
-    def render_alternate_template(self, template_name):
-        template = self.jinja_env.get_template(template_name)
-        return template.render(self.template_data)
+    def create_and_populate_work_dir(self, prev_doc):
+        workPath = self.cachePath / "docs" / prev_doc.h
+        os.makedirs(workPath, exist_ok=True)
+        os.chdir(workPath)
 
-    def render_filename(self):
-        template = self.jinja_env.from_string(self.config['output_basename'])
-        return template.render(self.config['analytics'])
+        # write the previous document
+        shutil.copyfile(prev_doc.cache_filepath, prev_doc.canonical_filename)
+        self.copy_all_supplemental_files()
 
-    def process_filters(self):
-        self.output_documents = []
-        template_basename = os.path.splitext(self.template_name)[0]
+        return workPath
 
-        # write the template to a file on disk
-        # run jinja process
-        prev_filename = self.template_name
-        canonical_filename = prev_filename
+    def render_and_save_template(self, template_file):
+        if template_file == "%s.md" % self.h:
+            pretty_name = "template.md"
+            h, text = self.render_text_template()
+        else:
+            pretty_name = template_file
+            h, text = self.render_file_template(template_file)
 
-        if self.config.get("output_basename"):
-            canonical_filename = self.render_filename()
+        with open(self.cachePath / template_file, 'w') as f:
+            f.write(text)
 
-        h = hash_for_template_text(self.template_text())
+        doc = GeneratedFile(pretty_name, h, file_type=FileType.TEMPLATE,
+                cache_filepath=self.cachePath / template_file)
+        self.documents[pretty_name] = doc
 
-        work_filepath = self.templateWorkPath / canonical_filename
-        with open(work_filepath, 'w') as f:
-            f.write(self.render_template())
+        return doc
 
-        # then, run any filters on the resulting document
-        # save starting working dir so we can go back later
+    def generate_documents(self):
+        """
+        Render all the templates and apply all the document filters on them.
+        """
+        self.populate_template_data()
+
+        # save current working directory so we can return to it later
         curdir = os.getcwd()
-        os.chdir(self.templateWorkPath)
+        
+        for template_file in self.template_filenames:
+            template_doc = self.render_and_save_template(template_file)
+            doc = template_doc
 
-        for filter_opts in self.config.get('filters', []):
-            if len(filter_opts) == 2:
-                filter_name, output_ext = filter_opts
-                filter_args = {}
-            else:
-                filter_name, output_ext, filter_args = filter_opts
+            for filter_opts in self.config.get('filters', []):
+                workPath = self.create_and_populate_work_dir(doc)
 
-            filter_fn = output_filters.__dict__["do_%s" % filter_name]
-            canonical_filename = "%s.%s" % (template_basename, output_ext)
-            result_filename = "%s.%s" % (h, output_ext)
-            cache_filepath = self.cachePath / result_filename
+                if len(filter_opts) == 2:
+                    filter_name, output_ext = filter_opts
+                    filter_args = {}
+                else:
+                    filter_name, output_ext, filter_args = filter_opts
 
-            filter_fn(self, prev_filename, result_filename, output_ext, filter_args)
-            self.logger.info("generated %s" % result_filename)
+                filter_doc_hash = hash_for_document(template_doc.h, filter_name, output_ext, filter_args)
+                result_filename = "%s.%s" % (os.path.splitext(doc.canonical_filename)[0], output_ext)
+                filter_fn = output_filters.__dict__["do_%s" % filter_name]
+                filter_fn(doc.canonical_filename, result_filename, output_ext, filter_args)
+                
+                doc = GeneratedFile(result_filename, filter_doc_hash, file_type=FileType.DOCUMENT, 
+                    cache_filepath = workPath / result_filename)
+                self.documents[result_filename] = doc
+    
+                self.upload_to_storages(result_filename, doc.cache_filepath)
 
-            shutil.copyfile(result_filename, cache_filepath)
-            prev_filename = result_filename
-            work_filepath = self.templateWorkPath / prev_filename
-
+        # change back to original working directory
         os.chdir(curdir)
 
-        return work_filepath
+    def publish_documents(self):
+        curdir = os.getcwd()
+        os.chdir(self.outputPath)
+
+        for doc in self.documents.values():
+            shutil.copyfile(doc.cache_filepath, doc.canonical_filename)
+        self.copy_all_supplemental_files()
+
+        os.chdir(curdir)
+        print(self.outputPath)
+
+    def render_text_template(self):
+        template_text = self.config['template']
+        h = hash_for_template_text(template_text)
+        template = self.jinja_env.from_string(template_text)
+        return h, template.render(self.template_data)
+
+    def render_file_template(self, template_file):
+        template = self.jinja_env.get_template(template_file)
+        h = hash_for_template_file("templates/%s" % template_file)
+        return h, template.render(self.template_data)

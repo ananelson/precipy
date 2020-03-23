@@ -70,16 +70,16 @@ On initialization, a hash code is set for caching the results of this function:
 {{ d['precipy/analytics_function.py|pydoc']['AnalyticsFunction.generate_hash:source'] | highlight('py') }}
 
 
-### Supplemental Files
+### Generated Files
 
 Each function tracks various data files generated as a result of running the
 function. The `metadata.pkl` is used to store information about the function
 itself, and if the `metadata.pkl` file is present in the cache, then the
 function will not be run again.
 
-The SupplementalFile class is a lightweight class for easy access to attributes:
+The GeneratedFile class is a lightweight class for easy access to attributes:
 
-{{ d['precipy/analytics_function.py|pydoc']['SupplementalFile:source'] | highlight('py') }}
+{{ d['precipy/analytics_function.py|pydoc']['GeneratedFile:source'] | highlight('py') }}
 
 
 

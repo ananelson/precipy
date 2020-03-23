@@ -32,5 +32,7 @@ def render_data(info, analytics_modules, storages=None, custom_render_fns=None):
         info['storages'] = storages
     batch = Batch(info)
     batch.generate_analytics(analytics_modules)
-    output = batch.process_filters()
-    return output
+    batch.generate_documents()
+    print("abuot to publish documents...")
+    batch.publish_documents()
+    return batch
