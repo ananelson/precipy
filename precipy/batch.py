@@ -3,7 +3,6 @@ from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
 from precipy.analytics_function import AnalyticsFunction
-import precipy.filters
 from precipy.identifiers import FileType
 from precipy.identifiers import GeneratedFile
 from precipy.identifiers import hash_for_document
@@ -15,6 +14,7 @@ import glob
 import json
 import logging
 import os
+import precipy.filters
 import precipy.output_filters as output_filters
 import shutil
 import tempfile
@@ -92,7 +92,7 @@ class Batch(object):
             if isinstance(entries, str):
                 entries = [entries]
             if entries:
-                self.logger.info("  found template(s): %s" % ", ".join(entries))
+                self.logger.info("  found template(s): %s" % ", ".join(str(entries)))
             self.template_filenames += entries
 
         if "template" in self.config:
@@ -134,7 +134,7 @@ class Batch(object):
         if not af.metadata_path_exists():
             if af.download_from_storages(af.metadata_cache_filepath()):
                 af.load_metadata()
-                for sf in af.supplemental_files:
+                for sf in af.files:
                     filepath = af.supplemental_file_cache_filepath(sf.canonical_filename)
                     if not self.download_from_storages(filepath):
                         raise Exception("Couldn't download storage for %s" % filepath)
@@ -248,12 +248,17 @@ class Batch(object):
 
         return workPath
 
-    def render_and_save_template(self, template_file):
+    def render_and_save_template(self, template_file, document_basename=None):
+        if document_basename:
+            pretty_name = self.render_text(document_basename)
+        else:
+            pretty_name = None
+
         if template_file == "%s.md" % self.h:
-            pretty_name = "template.md"
+            pretty_name = pretty_name or "template.md"
             h, text = self.render_text_template()
         else:
-            pretty_name = template_file
+            pretty_name = pretty_name or template_file
             h, text = self.render_file_template(template_file)
 
         with open(self.cachePath / template_file, 'w') as f:
@@ -274,8 +279,14 @@ class Batch(object):
         # save current working directory so we can return to it later
         curdir = os.getcwd()
         
-        for template_file in self.template_filenames:
-            template_doc = self.render_and_save_template(template_file)
+        for template_info in self.template_filenames:
+            if isinstance(template_info, str):
+                template_file = template_info
+                template_name = None
+            elif isinstance(template_info, dict):
+                template_file = template_info['file']
+                template_name = template_info.get('name')
+            template_doc = self.render_and_save_template(template_file, template_name)
             doc = template_doc
 
             for filter_opts in self.config.get('filters', []):
@@ -337,11 +348,14 @@ class Batch(object):
                     storage.upload_output(doc.canonical_filename, doc.cache_filepath)
                 self.upload_all_supplemental_files()
 
+    def render_text(self, text):
+        template = self.jinja_env.from_string(text)
+        return template.render(self.template_data)
+
     def render_text_template(self):
         template_text = self.config['template']
         h = hash_for_template_text(template_text)
-        template = self.jinja_env.from_string(template_text)
-        return h, template.render(self.template_data)
+        return h, self.render_text(template_text)
 
     def render_file_template(self, template_file):
         template = self.jinja_env.get_template(template_file)
