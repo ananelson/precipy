@@ -14,7 +14,7 @@ class AnalyticsFunction(object):
     metadata_filename = "metadata.pkl"
     metadata_keys = ["function_name", "function_source", "function_output", "kwargs", "files", "function_elapsed_seconds"]
 
-    def __init__(self, fn, kwargs, previous_functions=None, storages=None, cachePath=None, constants=None):
+    def __init__(self, fn, kwargs, key=None, previous_functions=None, storages=None, cachePath=None, constants=None):
         """
         Arguments:
 
@@ -23,10 +23,12 @@ class AnalyticsFunction(object):
             previous_functions - a dictionary of function keys:hashcodes for previously run functions
             cachePath - an optional Path object representing the Batch's cache path, can be blank for testing
         """
+        self.key = key or fn.__name__
         self.fn = fn
         for k, v in (constants or {}).items():
             self.fn.__globals__[k] = v
         self.kwargs = kwargs
+        self.args = self.kwargs
         self.previous_functions = previous_functions or []
         self.generate_hash(self.fn, self.kwargs)
         self.set_cache_path(cachePath)

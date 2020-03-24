@@ -8,6 +8,7 @@ seaborn
 
 # for document filters
 jinja2
+pygments
 markdown
 pandoc
 Xhtml2pdf

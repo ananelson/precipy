@@ -28,7 +28,7 @@ def test_connect():
 def test_upload_and_download():
     af.storages = [storage]
     af.run_function()
-    public_url = af.supplemental_files["metadata.pkl"].public_urls[0]
+    public_url = af.files["metadata.pkl"].public_urls[0]
     assert public_url.endswith(af.metadata_cache_filename())
 
     result = af.download_from_storages(af.metadata_cache_filepath())

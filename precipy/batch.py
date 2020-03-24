@@ -3,6 +3,7 @@ from jinja2 import FileSystemLoader
 from jinja2 import select_autoescape
 from pathlib import Path
 from precipy.analytics_function import AnalyticsFunction
+import precipy.filters
 from precipy.identifiers import FileType
 from precipy.identifiers import GeneratedFile
 from precipy.identifiers import hash_for_document
@@ -36,10 +37,10 @@ class Batch(object):
             storage.init(self)
             storage.connect()
 
-    def upload_to_storages(self, canonical_filename, cache_filepath):
+    def upload_to_storages_cache(self, f):
         for storage in self.storages:
-            public_url = storage.upload_cache(cache_filepath)
-            self.documents[canonical_filename].public_urls.append(public_url)
+            public_url = storage.upload_cache(f.cache_filepath)
+            f.public_urls.append(public_url)
 
     def setup_logging(self):
         self.logger = logging.getLogger(name="precipy")
@@ -64,6 +65,7 @@ class Batch(object):
 
         self.cachePath = self.tempdir / self.cache_bucket_name
         self.outputPath = self.tempdir / self.output_bucket_name / "output"
+        self.localOutputPath = Path(self.output_bucket_name)
 
         os.makedirs(self.cachePath, exist_ok=True)
         shutil.rmtree(self.outputPath, ignore_errors=True)
@@ -75,6 +77,8 @@ class Batch(object):
         self.jinja_env = Environment(
             loader = FileSystemLoader(self.template_dir),
             autoescape=select_autoescape(['html', 'xml']))
+
+        self.jinja_env.filters['highlight'] = precipy.filters.highlight
 
         self.template_data = {}
 
@@ -173,7 +177,8 @@ class Batch(object):
             previous_functions=previous_functions, 
             storages=self.storages,
             cachePath=self.cachePath,
-            constants=self.config.get('constants', None)
+            constants=self.config.get('constants', None),
+            key=key
             )
 
     def get_fn_object(self, module_name, function_name):
@@ -197,7 +202,12 @@ class Batch(object):
 
         self.template_data['batch'] = self
         self.template_data['keys'] = self.functions.keys()
-        self.template_data['data'] = self.functions
+        self.template_data['functions'] = self.functions
+
+        for key, af in self.functions.items():
+            self.template_data[key] = af
+
+        self.template_data.update(self.config.get('constants', {}))
 
         # functions/modules for use within templates
         self.template_data['read_file_contents'] = read_file_contents
@@ -212,6 +222,14 @@ class Batch(object):
         for af in self.functions.values():
             for gf in af.files.values():
                 shutil.copyfile(gf.cache_filepath, gf.canonical_filename)
+
+    def upload_all_supplemental_files(self):
+        """
+        Uploads all supplemental files
+        """
+        for af in self.functions.values():
+            for gf in af.files.values():
+                self.upload_to_storages_cache(gf)
 
     def create_and_populate_work_dir(self, prev_doc):
         workPath = self.cachePath / "docs" / prev_doc.h
@@ -272,10 +290,27 @@ class Batch(object):
                     cache_filepath = workPath / result_filename)
                 self.documents[result_filename] = doc
     
-                self.upload_to_storages(result_filename, doc.cache_filepath)
+                self.upload_to_storages_cache(doc)
 
         # change back to original working directory
         os.chdir(curdir)
+
+    def rewrite_local_output(self):
+        if os.path.exists(self.localOutputPath):
+            if os.path.exists(self.localOutputPath / '.precipy'):
+                print("removing old %s" % self.localOutputPath)
+                shutil.rmtree(self.localOutputPath)
+            else:
+                print("Can't remove old %s" % self.localOutputPath)
+                return False
+
+        shutil.copytree(self.outputPath, self.localOutputPath)
+        with open(self.localOutputPath / ".precipy", 'w') as f:
+            f.write("Keep this here so precipy knows it's okay to delete this dir.")
+        with open(self.localOutputPath / "PrecipyREADME.txt", 'w') as f:
+            f.write("""This folder will be deleted and recreated with each run. 
+            Copy this folder elsewhere if you want to keep it permanently.""")
+        return True
 
     def publish_documents(self):
         curdir = os.getcwd()
@@ -286,7 +321,15 @@ class Batch(object):
         self.copy_all_supplemental_files()
 
         os.chdir(curdir)
-        print(self.outputPath)
+
+        print("output directory is %s" % self.outputPath)
+        if self.rewrite_local_output():
+            print("local output directory is %s" % self.localOutputPath)
+            for storage in self.storages:
+                storage.reset_output()
+                for doc in self.documents.values():
+                    storage.upload_output(doc.canonical_filename, doc.cache_filepath)
+                self.upload_all_supplemental_files()
 
     def render_text_template(self):
         template_text = self.config['template']

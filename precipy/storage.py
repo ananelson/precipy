@@ -97,8 +97,9 @@ class GoogleCloudStorage(Storage):
         blob.download_to_filename(cache_filepath)
 
     def reset_output(self):
-        self.storage_client.delete_bucket(self.output_bucket_name)
-        self.output_storage_bucket = self.storage_client.create_bucket(self.output_bucket_name)
+        #self.output_storage_bucket.delete(force=True)
+        #self.output_storage_bucket = self.storage_client.create_bucket(self.output_bucket_name)
+        pass
 
     def _upload_output(self, canonical_filename, cache_filepath):
         blob = self.cache_storage_bucket.blob(canonical_filename)

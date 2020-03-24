@@ -4,7 +4,7 @@ import tests.analytics
 def test_render_data():
     config = {
         # The report template
-        'template' : """a is {{ data['wavy_line_plot']['kwargs']['a'] }}""",
+        'template' : """a is {{ wavy_line_plot.args.a }}""",
         # Sources for data prep & asset gen (plots, json data)
         'analytics' : [
             ['wavy_line_plot', {'a' : 7, 'b' : 4}]
@@ -12,6 +12,6 @@ def test_render_data():
         }
 
     batch = render_data(config, analytics_modules=[tests.analytics])
-    output_filename = batch.files
-    with open(output_filename, 'r') as f:
+    final_doc = list(batch.documents.values())[0]
+    with open(final_doc.cache_filepath, 'r') as f:
         assert f.read() == "a is 7"

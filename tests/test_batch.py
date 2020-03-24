@@ -1,11 +1,10 @@
 from precipy.batch import Batch
-from precipy.main import render_data
 import tests.analytics
 import os
 
 config = {
     # The report template
-    'template' : """a is {{ data['wavy_line_plot']['kwargs']['a'] }}""",
+    'template' : """a is {{ wavy_line_plot.args.a }}""",
     "filters" : [["markdown", "html"]],
     # Sources for data prep & asset gen (plots, json data)
     'analytics' : [
