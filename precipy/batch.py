@@ -128,6 +128,9 @@ class Batch(object):
     def process_analytics_entry(self, key, kwargs, previous_functions):
         af = self.resolve_function(key, kwargs, previous_functions)
 
+        if af.metadata_path_exists():
+            af.load_metadata()
+
         if not af.metadata_path_exists():
             if af.download_from_storages(af.metadata_cache_filepath()):
                 af.load_metadata()
@@ -138,10 +141,12 @@ class Batch(object):
 
         if not af.metadata_path_exists():
             af.run_function()
+            af.is_populated = True
             af.save_metadata()
             af.from_cache = False
         else:
-            if not af.function_output:
+            if not af.is_populated:
+                print("loading metadata from %s" % af.metadata_cache_filepath())
                 af.load_metadata()
 
         self.functions[key] = af

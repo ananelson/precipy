@@ -40,11 +40,11 @@ class Storage(object):
         """
         cache_filename = cache_filepath.name
         try:
-            self._download_cache(cache_filename, cache_filepath)
-            return True
-        except Exception as e:
-            print(e)
+            result = self._download_cache(cache_filename, cache_filepath)
+        except Exception:
             return False
+        if isinstance(result, bool):
+            return result
 
     def _download_cache(self, cache_filename, cache_filepath):
         """
@@ -94,7 +94,11 @@ class GoogleCloudStorage(Storage):
 
     def _download_cache(self, cache_filename, cache_filepath):
         blob = self.cache_storage_bucket.blob(cache_filename)
-        blob.download_to_filename(cache_filepath)
+        if blob.exists:
+            blob.download_to_filename(cache_filepath)
+            return True
+        else:
+            return False
 
     def reset_output(self):
         #self.output_storage_bucket.delete(force=True)

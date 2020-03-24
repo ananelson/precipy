@@ -23,6 +23,7 @@ class AnalyticsFunction(object):
             previous_functions - a dictionary of function keys:hashcodes for previously run functions
             cachePath - an optional Path object representing the Batch's cache path, can be blank for testing
         """
+        self.is_populated = False
         self.key = key or fn.__name__
         self.fn = fn
         for k, v in (constants or {}).items():
@@ -133,6 +134,7 @@ class AnalyticsFunction(object):
         meta = self.read_metadata()
         for k, v in meta.items():
             setattr(self, k, v)
+        self.is_populated = True
         return meta
 
     def supplemental_file_hash(self, canonical_filename, fn_h=None):
