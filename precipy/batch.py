@@ -5,11 +5,12 @@ from pathlib import Path
 from precipy.analytics_function import AnalyticsFunction
 from precipy.identifiers import FileType
 from precipy.identifiers import GeneratedFile
-from precipy.identifiers import hash_for_template_text
-from precipy.identifiers import hash_for_template_file
 from precipy.identifiers import hash_for_document
+from precipy.identifiers import hash_for_template_file
+from precipy.identifiers import hash_for_template_text
 from uuid import uuid4
 import datetime
+import glob
 import json
 import logging
 import os
@@ -69,24 +70,37 @@ class Batch(object):
         os.makedirs(self.outputPath, exist_ok=True)
 
     def setup_template_environment(self):
-        template_dir = self.config.get('template_dir', "templates")
+        self.template_dir = self.config.get('template_dir', "templates")
 
         self.jinja_env = Environment(
-            loader = FileSystemLoader(template_dir),
+            loader = FileSystemLoader(self.template_dir),
             autoescape=select_autoescape(['html', 'xml']))
 
         self.template_data = {}
 
     def setup_document_templates(self):
+        self.logger.info("Collecting list of document templates to process...")
         self.template_filenames = []
-        self.template_filenames += self.config.get("templates", [])
-        self.template_filenames += self.config.get("template_files", [])
-        if self.config.get("tempalte_file"):
-            self.template_filenames += [self.config["template_file"]]
+
+        for key in ['templates', 'template_file', 'template_files']:
+            self.logger.info("Looking for templates specified under config key '%s'" % key)
+            entries = self.config.get(key, [])
+            if isinstance(entries, str):
+                entries = [entries]
+            if entries:
+                self.logger.info("  found template(s): %s" % ", ".join(entries))
+            self.template_filenames += entries
 
         if "template" in self.config:
             # template content is embedded in config - mostly used for testing
             self.template_filenames += ["%s.md" % self.h]
+
+        if len(self.template_filenames) == 0:
+            self.logger.info("No specified templates found, will add all in %s directory" % self.template_dir)
+            raw_template_files = glob.glob("%s/*" % self.template_dir)
+            if raw_template_files:
+                self.logger.info("  found template(s): %s" % ", ".join(raw_template_files))
+            self.template_filenames += [f.split("/")[1] for f in raw_template_files]
 
     ## Analytics
 
@@ -158,7 +172,9 @@ class Batch(object):
         return AnalyticsFunction(fn, kwargs,
             previous_functions=previous_functions, 
             storages=self.storages,
-            cachePath=self.cachePath)
+            cachePath=self.cachePath,
+            constants=self.config.get('constants', None)
+            )
 
     def get_fn_object(self, module_name, function_name):
         for mod in self.analytics_modules:
