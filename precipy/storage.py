@@ -39,12 +39,7 @@ class Storage(object):
         Should return true if sucessful, false if file does not exist remotely
         """
         cache_filename = cache_filepath.name
-        try:
-            result = self._download_cache(cache_filename, cache_filepath)
-        except Exception:
-            return False
-        if isinstance(result, bool):
-            return result
+        return self._download_cache(cache_filename, cache_filepath)
 
     def _download_cache(self, cache_filename, cache_filepath):
         """
@@ -80,7 +75,9 @@ class GoogleCloudStorage(Storage):
         try:
             return self.storage_client.get_bucket(bucket_name)
         except google.api_core.exceptions.NotFound:
-            return self.storage_client.create_bucket(bucket_name)
+            bucket = self.storage_client.create_bucket(bucket_name)
+            bucket.make_public(recursive=True, future=True)
+            return bucket
 
     def connect(self):
         self.storage_client = storage.Client()
@@ -94,7 +91,7 @@ class GoogleCloudStorage(Storage):
 
     def _download_cache(self, cache_filename, cache_filepath):
         blob = self.cache_storage_bucket.blob(cache_filename)
-        if blob.exists:
+        if blob.exists():
             blob.download_to_filename(cache_filepath)
             return True
         else:

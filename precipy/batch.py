@@ -207,12 +207,13 @@ class Batch(object):
 
         self.template_data['batch'] = self
         self.template_data['keys'] = self.functions.keys()
+
         self.template_data['functions'] = self.functions
+        self.template_data.update(self.functions)
 
-        for key, af in self.functions.items():
-            self.template_data[key] = af
-
-        self.template_data.update(self.config.get('constants', {}))
+        constants = self.config.get('constants', {})
+        self.template_data.update(constants)
+        self.template_data['constants'] = constants
 
         # functions/modules for use within templates
         self.template_data['read_file_contents'] = read_file_contents
