@@ -5,8 +5,8 @@ You need to write your own python script so you can import analytics modules and
 
 It is recommended to import render_file from here into your script.
 """
-
 from precipy.batch import Batch
+import importlib
 import json
 
 def render_file(filepath, analytics_modules, storages=None, custom_render_fns=None):
@@ -16,7 +16,7 @@ def render_file(filepath, analytics_modules, storages=None, custom_render_fns=No
             storages=storages,
             custom_render_fns=custom_render_fns)
 
-def render_data(info, analytics_modules, storages=None, custom_render_fns=None):
+def render_data(info, raw_analytics_modules, storages=None, custom_render_fns=None):
     """
     Runs all analytics then generates any reports, per the configuration file specified by filepath.
 
@@ -30,9 +30,17 @@ def render_data(info, analytics_modules, storages=None, custom_render_fns=None):
         info['custom_render_fns'] = custom_render_fns
     if storages:
         info['storages'] = storages
+
+    analytics_modules = []
+    for ram in raw_analytics_modules:
+        if isinstance(ram, str):
+            am = importlib.import_module(ram)
+        else:
+            am = ram
+        analytics_modules.append(am)
+
     batch = Batch(info)
     batch.generate_analytics(analytics_modules)
     batch.generate_documents()
-    print("abuot to publish documents...")
     batch.publish_documents()
     return batch

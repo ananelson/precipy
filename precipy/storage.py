@@ -1,12 +1,3 @@
-try: 
-    import google.api_core.exceptions
-    import google.auth.exceptions
-    from google.cloud import storage
-except Exception as e:
-    print("google cloud storage unavailable")
-    print(str(e))
-
-
 class Storage(object):
     def init(self, batch):
         self.cache_bucket_name = batch.cache_bucket_name
@@ -72,6 +63,7 @@ class Storage(object):
 
 class GoogleCloudStorage(Storage):
     def find_or_create_bucket(self, bucket_name):
+        import google.api_code.exceptions
         try:
             return self.storage_client.get_bucket(bucket_name)
         except google.api_core.exceptions.NotFound:
@@ -80,6 +72,7 @@ class GoogleCloudStorage(Storage):
             return bucket
 
     def connect(self):
+        from google.cloud import storage
         self.storage_client = storage.Client()
         self.cache_storage_bucket = self.find_or_create_bucket(self.cache_bucket_name)
         self.output_storage_bucket = self.find_or_create_bucket(self.output_bucket_name)
@@ -106,3 +99,7 @@ class GoogleCloudStorage(Storage):
         blob = self.cache_storage_bucket.blob(canonical_filename)
         blob.upload_from_filename(str(cache_filepath))
         return blob.public_url
+
+AVAILABLE_STORAGES = {
+        'google' : GoogleCloudStorage
+        }

@@ -1,8 +1,9 @@
 import setuptools
+from precipy import PRECIPY_VERSION
 
 setuptools.setup(
     name="precipy",
-    version="0.2.3",
+    version=PRECIPY_VERSION,
     author="Ana Nelson",
     author_email="ana@ananelson.com",
     url="https://github.com/ananelson/precipy",
@@ -16,5 +17,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
+    scripts = ["bin/precipy"],
     python_requires='>=3.6',
 )

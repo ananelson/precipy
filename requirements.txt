@@ -1,0 +1,3 @@
+# for all the filters to work
+xhtml2pdf
+weasyprint

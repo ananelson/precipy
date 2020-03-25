@@ -1,4 +1,18 @@
-## Batch
+# Precipy Developer Documentation
+
+[TOC]
+
+## Usage & Customization
+
+See the usage guide for more details.
+
+### Customizing Your Entry Point
+
+If your analytics functions are installed as a package
+
+# API
+
+## The Batch Class
 
 The Batch class encapsulates and orchestrates a single run.
 
@@ -23,7 +37,9 @@ Precipy is designed to be strongly integrated with cloud storage, so that multip
 
 And finally, the `setup_document_template()` method is:
 
-{{ d['precipy/batch.py|pydoc']['Batch.setup_document_template:source'] | highlight('py') }}
+{{ d['precipy/batch.py|pydoc']['Batch.setup_template_environment:source'] | highlight('py') }}
+
+{{ d['precipy/batch.py|pydoc']['Batch.setup_storages:source'] | highlight('py') }}
 
 ### Analytics
 

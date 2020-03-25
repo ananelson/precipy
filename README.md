@@ -4,5 +4,5 @@ A cloud-enabled, analytics-focused document generation tool from the author of [
 
 ## Example Usage
 
-See precipy-demo/ repository for an example.
+See https://github.com/ananelson/precipy-demo/ repository for an example.
 

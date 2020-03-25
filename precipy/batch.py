@@ -14,7 +14,7 @@ import glob
 import json
 import logging
 import os
-import precipy.filters
+import precipy.jinja_filters as jinja_filters
 import precipy.output_filters as output_filters
 import shutil
 import tempfile
@@ -30,17 +30,6 @@ class Batch(object):
         self.setup_storages()
         self.functions = {}
         self.documents = {}
-
-    def setup_storages(self):
-        self.storages = self.config.get('storages', [])
-        for storage in self.storages:
-            storage.init(self)
-            storage.connect()
-
-    def upload_to_storages_cache(self, f):
-        for storage in self.storages:
-            public_url = storage.upload_cache(f.cache_filepath)
-            f.public_urls.append(public_url)
 
     def setup_logging(self):
         self.logger = logging.getLogger(name="precipy")
@@ -78,9 +67,20 @@ class Batch(object):
             loader = FileSystemLoader(self.template_dir),
             autoescape=select_autoescape(['html', 'xml']))
 
-        self.jinja_env.filters['highlight'] = precipy.filters.highlight
+        self.jinja_env.filters['highlight'] = jinja_filters.highlight
 
         self.template_data = {}
+
+    def setup_storages(self):
+        self.storages = self.config.get('storages', [])
+        for storage in self.storages:
+            storage.init(self)
+            storage.connect()
+
+    def upload_to_storages_cache(self, f):
+        for storage in self.storages:
+            public_url = storage.upload_cache(f.cache_filepath)
+            f.public_urls.append(public_url)
 
     def setup_document_templates(self):
         self.logger.info("Collecting list of document templates to process...")

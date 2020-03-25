@@ -1,4 +1,5 @@
 docs/*.md|jinja|markdown|easyhtml:
+    - markdown: {'toc' : true}
     - precipy/*.py|pydoc:
         - precipy/*.py:
             output: False

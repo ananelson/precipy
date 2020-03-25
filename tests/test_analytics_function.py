@@ -22,14 +22,14 @@ bf = AnalyticsFunction(bar, {})
 cf = AnalyticsFunction(baz, {}, previous_functions={"bar": bf.h})
 
 def test_function_name():
-    assert af.function_name() == "foo"
-    assert bf.function_name() == "bar"
-    assert cf.function_name() == "baz"
+    assert af.function_name == "foo"
+    assert bf.function_name == "bar"
+    assert cf.function_name == "baz"
 
 def test_function_source():
-    assert "def foo" in af.function_source()
-    assert "def bar" in bf.function_source()
-    assert "def baz" in cf.function_source()
+    assert "def foo" in af.function_source
+    assert "def bar" in bf.function_source
+    assert "def baz" in cf.function_source
 
 def test_init_analytics_fn():
     assert len(af.h) == 64
@@ -52,7 +52,6 @@ def test_run_function():
     af.run_function()
     assert af.function_output == 1
     meta = af.function_metadata()
-    print(meta)
     assert meta['function_output'] == 1
 
 def test_add_existing_file():

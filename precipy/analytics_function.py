@@ -36,12 +36,8 @@ class AnalyticsFunction(object):
         self.setup_files()
         self.function_output = None
         self.storages = storages or []
-
-    def function_name(self):
-        return self.fn.__name__
-
-    def function_source(self):
-        return inspect.getsource(self.fn)
+        self.function_name = self.fn.__name__
+        self.function_source = inspect.getsource(self.fn)
 
     def generate_hash(self, fn, kwargs):
         """
@@ -103,13 +99,7 @@ class AnalyticsFunction(object):
         return False
 
     def function_metadata(self):
-        def get_or_run_attr(self, key):
-            attr = getattr(self, key, None)
-            if callable(attr):
-                return attr()
-            else:
-                return attr
-        return dict((k, get_or_run_attr(self, k)) for k in self.metadata_keys)
+        return dict((k, getattr(self, k, None)) for k in self.metadata_keys)
 
     def metadata_cache_filename(self):
         return "%s.pkl" % self.h
