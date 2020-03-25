@@ -146,7 +146,6 @@ class Batch(object):
             af.from_cache = False
         else:
             if not af.is_populated:
-                print("loading metadata from %s" % af.metadata_cache_filepath())
                 af.load_metadata()
 
         self.functions[key] = af

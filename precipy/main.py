@@ -8,6 +8,8 @@ It is recommended to import render_file from here into your script.
 from precipy.batch import Batch
 import importlib
 import json
+import sys
+
 
 def render_file(filepath, analytics_modules, storages=None, custom_render_fns=None):
     with open(filepath, 'r') as f:
@@ -15,6 +17,16 @@ def render_file(filepath, analytics_modules, storages=None, custom_render_fns=No
     return render_data(info, analytics_modules, 
             storages=storages,
             custom_render_fns=custom_render_fns)
+
+def import_module_or_file(ram):
+    try:
+        return importlib.import_module(ram)
+    except ModuleNotFoundError:
+        spec = importlib.util.spec_from_file_location(ram, "%s.py" % ram)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[ram] = module
+        spec.loader.exec_module(module)
+        return module
 
 def render_data(info, raw_analytics_modules, storages=None, custom_render_fns=None):
     """
@@ -34,7 +46,7 @@ def render_data(info, raw_analytics_modules, storages=None, custom_render_fns=No
     analytics_modules = []
     for ram in raw_analytics_modules:
         if isinstance(ram, str):
-            am = importlib.import_module(ram)
+            am = import_module_or_file(ram)
         else:
             am = ram
         analytics_modules.append(am)

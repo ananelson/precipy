@@ -11,7 +11,7 @@ def test_render_data():
             ]
         }
 
-    batch = render_data(config, analytics_modules=[tests.analytics])
+    batch = render_data(config, [tests.analytics])
     final_doc = list(batch.documents.values())[0]
     with open(final_doc.cache_filepath, 'r') as f:
         assert f.read() == "a is 7"

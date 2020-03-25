@@ -63,7 +63,7 @@ class Storage(object):
 
 class GoogleCloudStorage(Storage):
     def find_or_create_bucket(self, bucket_name):
-        import google.api_code.exceptions
+        import google.api_core.exceptions
         try:
             return self.storage_client.get_bucket(bucket_name)
         except google.api_core.exceptions.NotFound:
