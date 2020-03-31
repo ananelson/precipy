@@ -134,7 +134,7 @@ class Batch(object):
         if not af.metadata_path_exists():
             if af.download_from_storages(af.metadata_cache_filepath()):
                 af.load_metadata()
-                for sf in af.files:
+                for sf in af.files.values():
                     filepath = af.supplemental_file_cache_filepath(sf.canonical_filename)
                     if not self.download_from_storages(filepath):
                         raise Exception("Couldn't download storage for %s" % filepath)

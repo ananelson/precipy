@@ -11,10 +11,10 @@ import json
 import sys
 
 
-def render_file(filepath, analytics_modules, storages=None, custom_render_fns=None):
+def render_file(filepath, raw_analytics_modules, storages=None, custom_render_fns=None):
     with open(filepath, 'r') as f:
         info = json.load(f)
-    return render_data(info, analytics_modules, 
+    return render_data(info, raw_analytics_modules,
             storages=storages,
             custom_render_fns=custom_render_fns)
 
