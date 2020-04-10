@@ -11,6 +11,7 @@ from precipy.identifiers import hash_for_template_text
 from uuid import uuid4
 import datetime
 import glob
+import itertools
 import json
 import logging
 import os
@@ -108,6 +109,24 @@ class Batch(object):
 
     ## Analytics
 
+    def range_environments(self):
+        if not 'ranges' in self.config:
+            return [{}]
+
+        var_names = sorted(self.config['ranges'])
+        var_ranges = []
+        for var_name in var_names:
+            range_spec = self.config['ranges'][var_name]
+
+            if isinstance(range_spec, dict):
+                rng = range(range_spec.get('start'), range_spec.get('stop'), range_spec.get('step'))
+            else:
+                rng = range_spec
+
+            var_ranges.append(rng)
+
+        return [dict(zip(var_names, var_values)) for var_values in itertools.product(*var_ranges)]
+
     def generate_analytics(self, analytics_modules):
         self.analytics_modules = analytics_modules
 
@@ -118,9 +137,19 @@ class Batch(object):
         self.current_function_data = None
 
         previous_functions = {}
+        range_environments = self.range_environments()
         for key, kwargs in self.config.get('analytics', []):
-            h = self.process_analytics_entry(key, kwargs, previous_functions)
-            previous_functions[key] = h
+            for range_env in range_environments:
+                if not 'function_name' in kwargs:
+                    kwargs['function_name'] = key
+                range_env_key = key
+                for k, v in range_env.items():
+                    if k not in kwargs:
+                        continue
+                    range_env_key = range_env_key + "__%s_%s" % (k, v)
+                    kwargs[k] = v
+                h = self.process_analytics_entry(range_env_key, kwargs, previous_functions)
+                previous_functions[range_env_key] = h
 
         self.current_function_name = None
         self.current_function_data = None

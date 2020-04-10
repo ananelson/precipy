@@ -1,4 +1,4 @@
-PRECIPY_VERSION="0.2.6"
+PRECIPY_VERSION="0.3.0"
 
 class PrecipyException(Exception):
     pass
