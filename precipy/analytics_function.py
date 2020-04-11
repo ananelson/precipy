@@ -78,7 +78,8 @@ class AnalyticsFunction(object):
         return parent_dir
 
     def call_function(self):
-        return self.fn(self, **self.kwargs)
+        kwargs = dict((k, v) for k, v in self.kwargs.items() if k != 'function_name')
+        return self.fn(self, **kwargs)
 
     def run_function(self):
         start_time = time.time()

@@ -52,7 +52,5 @@ def render_data(info, raw_analytics_modules, storages=None, custom_render_fns=No
         analytics_modules.append(am)
 
     batch = Batch(info)
-    batch.generate_analytics(analytics_modules)
-    batch.generate_documents()
-    batch.publish_documents()
+    batch.run(analytics_modules)
     return batch

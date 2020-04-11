@@ -20,8 +20,12 @@ import precipy.output_filters as output_filters
 import shutil
 import tempfile
 
+def generate_range_key(range_env):
+    return "__".join("%s_%s" % (k, range_env[k]) for k in sorted(range_env))
+
 class Batch(object):
     def __init__(self, config):
+        self.orig_dir = os.getcwd()
         self.config = config
         self.h = str(uuid4())
         self.setup_logging()
@@ -30,6 +34,7 @@ class Batch(object):
         self.setup_document_templates()
         self.setup_storages()
         self.functions = {}
+        self.function_meta = {}
         self.documents = {}
 
     def setup_logging(self):
@@ -53,13 +58,20 @@ class Batch(object):
         self.output_bucket_name = self.config.get('output_bucket_name', "output")
         self.tempdir = Path(self.config.get('tempdir', tempfile.gettempdir())) / "precipy"
 
+        self.logger.info("tempdir is %s" % self.tempdir)
+
         self.cachePath = self.tempdir / self.cache_bucket_name
-        self.outputPath = self.tempdir / self.output_bucket_name / "output"
+        self.outputPath = self.tempdir / self.output_bucket_name
         self.localOutputPath = Path(self.output_bucket_name)
 
         os.makedirs(self.cachePath, exist_ok=True)
         shutil.rmtree(self.outputPath, ignore_errors=True)
         os.makedirs(self.outputPath, exist_ok=True)
+
+    def rangeOutputPath(self):
+        path = self.outputPath / self.current_range_key
+        os.makedirs(path, exist_ok=True)
+        return path
 
     def setup_template_environment(self):
         self.template_dir = self.config.get('template_dir', "templates")
@@ -93,7 +105,7 @@ class Batch(object):
             if isinstance(entries, str):
                 entries = [entries]
             if entries:
-                self.logger.info("  found template(s): %s" % ", ".join(str(entries)))
+                self.logger.info("  found template(s): %s" % ", ".join(str(e) for e in entries))
             self.template_filenames += entries
 
         if "template" in self.config:
@@ -107,9 +119,24 @@ class Batch(object):
                 self.logger.info("  found template(s): %s" % ", ".join(raw_template_files))
             self.template_filenames += [f.split("/")[1] for f in raw_template_files]
 
-    ## Analytics
+    def init_range(self, range_env):
+        self.current_range_env = range_env
+        self.current_range_key = generate_range_key(range_env)
+        self.functions[self.current_range_key] = {}
+        self.documents[self.current_range_key] = {}
+
+    def run(self, analytics_modules):
+        for range_env in self.range_environments():
+            self.init_range(range_env)
+            self.generate_analytics(analytics_modules)
+            self.generate_documents()
+            self.publish_documents()
 
     def range_environments(self):
+        """
+        Generates a list of dictionaries containing variable names and values
+        for every combination of the specified ranges.
+        """
         if not 'ranges' in self.config:
             return [{}]
 
@@ -127,6 +154,7 @@ class Batch(object):
 
         return [dict(zip(var_names, var_values)) for var_values in itertools.product(*var_ranges)]
 
+    ## Analytics
     def generate_analytics(self, analytics_modules):
         self.analytics_modules = analytics_modules
 
@@ -137,19 +165,14 @@ class Batch(object):
         self.current_function_data = None
 
         previous_functions = {}
-        range_environments = self.range_environments()
-        for key, kwargs in self.config.get('analytics', []):
-            for range_env in range_environments:
-                if not 'function_name' in kwargs:
-                    kwargs['function_name'] = key
-                range_env_key = key
-                for k, v in range_env.items():
-                    if k not in kwargs:
-                        continue
-                    range_env_key = range_env_key + "__%s_%s" % (k, v)
-                    kwargs[k] = v
-                h = self.process_analytics_entry(range_env_key, kwargs, previous_functions)
-                previous_functions[range_env_key] = h
+        for key, kwargs in self.config.copy().get('analytics', []):
+            for k, v in self.current_range_env.items():
+                if k not in kwargs:
+                    continue
+                self.logger.debug("updating value for %s to %s" % (k, str(v)))
+                kwargs[k] = v
+            h = self.process_analytics_entry(key, kwargs, previous_functions)
+            previous_functions[key] = h
 
         self.current_function_name = None
         self.current_function_data = None
@@ -177,7 +200,7 @@ class Batch(object):
             if not af.is_populated:
                 af.load_metadata()
 
-        self.functions[key] = af
+        self.functions[self.current_range_key][key] = af
         return af.h
 
     def resolve_function(self, key, kwargs, previous_functions):
@@ -189,7 +212,6 @@ class Batch(object):
 
         if 'function_name' in kwargs:
             qual_function_name = kwargs['function_name']
-            del kwargs['function_name']
         else:
             qual_function_name = key
 
@@ -225,10 +247,10 @@ class Batch(object):
 
     def populate_template_data(self):
         def read_file_contents(path):
-            with open(self.outputPath / path, 'r') as f:
+            with open(self.rangeOutputPath() / path, 'r') as f:
                 return f.read()
         def load_json(path):
-            with open(self.outputPath / path, 'r') as f:
+            with open(self.rangeOutputPath() / path, 'r') as f:
                 return json.load(f)
         def fn_params(qual_fn_name, param_name):
             return self.config['analytics'][qual_fn_name][param_name]
@@ -236,8 +258,9 @@ class Batch(object):
         self.template_data['batch'] = self
         self.template_data['keys'] = self.functions.keys()
 
-        self.template_data['functions'] = self.functions
-        self.template_data.update(self.functions)
+        functions = self.functions[self.current_range_key]
+        self.template_data['functions'] = functions
+        self.template_data.update(functions)
 
         constants = self.config.get('constants', {})
         self.template_data.update(constants)
@@ -253,7 +276,7 @@ class Batch(object):
         """
         Copies all supplemental files to the current working directory.
         """
-        for af in self.functions.values():
+        for af in self.functions[self.current_range_key].values():
             for gf in af.files.values():
                 shutil.copyfile(gf.cache_filepath, gf.canonical_filename)
 
@@ -294,7 +317,7 @@ class Batch(object):
 
         doc = GeneratedFile(pretty_name, h, file_type=FileType.TEMPLATE,
                 cache_filepath=self.cachePath / template_file)
-        self.documents[pretty_name] = doc
+        self.documents[self.current_range_key][pretty_name] = doc
 
         return doc
 
@@ -304,9 +327,6 @@ class Batch(object):
         """
         self.populate_template_data()
 
-        # save current working directory so we can return to it later
-        curdir = os.getcwd()
-        
         for template_info in self.template_filenames:
             if isinstance(template_info, str):
                 template_file = template_info
@@ -333,25 +353,30 @@ class Batch(object):
                 
                 doc = GeneratedFile(result_filename, filter_doc_hash, file_type=FileType.DOCUMENT, 
                     cache_filepath = workPath / result_filename)
-                self.documents[result_filename] = doc
+                self.documents[self.current_range_key][result_filename] = doc
     
                 self.upload_to_storages_cache(doc)
 
-        # change back to original working directory
-        os.chdir(curdir)
+            # change back to original working directory
+            os.chdir(self.orig_dir)
 
     def rewrite_local_output(self):
+        print(os.getcwd())
         if os.path.exists(self.localOutputPath):
-            if os.path.exists(self.localOutputPath / '.precipy'):
+            if os.path.exists(self.localOutputPath / (".%s" % self.h)):
+                pass
+            elif os.path.exists(self.localOutputPath / '.precipy'):
                 print("removing old %s" % self.localOutputPath)
                 shutil.rmtree(self.localOutputPath)
             else:
-                print("Can't remove old %s" % self.localOutputPath)
+                print("Can't remove old: %s" % self.localOutputPath)
                 return False
 
-        shutil.copytree(self.outputPath, self.localOutputPath)
+        shutil.copytree(self.rangeOutputPath(), self.localOutputPath / self.current_range_key)
         with open(self.localOutputPath / ".precipy", 'w') as f:
             f.write("Keep this here so precipy knows it's okay to delete this dir.")
+        with open(self.localOutputPath / (".%s" % self.h), 'w') as f:
+            f.write("Track which batch this is for.")
         with open(self.localOutputPath / "PrecipyREADME.txt", 'w') as f:
             f.write("""This folder will be deleted and recreated with each run. 
             Copy this folder elsewhere if you want to keep it permanently.""")
@@ -359,15 +384,15 @@ class Batch(object):
 
     def publish_documents(self):
         curdir = os.getcwd()
-        os.chdir(self.outputPath)
+        os.chdir(self.rangeOutputPath())
 
-        for doc in self.documents.values():
+        for doc in self.documents[self.current_range_key].values():
             shutil.copyfile(doc.cache_filepath, doc.canonical_filename)
         self.copy_all_supplemental_files()
 
         os.chdir(curdir)
 
-        print("output directory is %s" % self.outputPath)
+        print("output directory is %s" % self.rangeOutputPath())
         if self.rewrite_local_output():
             print("local output directory is %s" % self.localOutputPath)
             for storage in self.storages:
@@ -386,6 +411,8 @@ class Batch(object):
         return h, self.render_text(template_text)
 
     def render_file_template(self, template_file):
+        print("Looking for file '%s'" % template_file)
+        print(self.jinja_env.loader.__dict__)
         template = self.jinja_env.get_template(template_file)
-        h = hash_for_template_file("templates/%s" % template_file)
+        h = hash_for_template_file(self.template_dir + "/%s" % template_file)
         return h, template.render(self.template_data)
